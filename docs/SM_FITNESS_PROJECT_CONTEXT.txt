@@ -1,0 +1,593 @@
+========================================================
+SM FITNESS — GYM MANAGEMENT SYSTEM
+COMPLETE PROJECT CONTEXT & PLANNING DOCUMENT
+========================================================
+Last Updated: April 2026
+Status: Planning Complete — Ready for Development
+
+
+--------------------------------------------------------
+1. PROJECT OVERVIEW
+--------------------------------------------------------
+Project Name    : SM FITNESS Gym Management System
+Type            : Progressive Web App (PWA) — Admin Only
+Purpose         : Manage gym members, fees, memberships, payments, and email notifications
+Users           : Single admin (gym owner) only
+Branches        : Single branch (can extend later)
+Approach        : Learn and build using AI agent — step by step, production ready
+
+
+--------------------------------------------------------
+2. FINAL TECH STACK (100% FREE)
+--------------------------------------------------------
+Layer               Tool                    Free Limit / Notes
+-----------         --------------------    ----------------------------------
+Frontend + API      Next.js (App Router)    Free on Vercel
+Styling             Tailwind CSS            Free, open source
+Database            Supabase (PostgreSQL)   500MB DB, free forever
+Auth                Supabase Auth           Built-in, free
+File Storage        Supabase Storage        1GB free (photos)
+Email               Nodemailer + Gmail SMTP 500 emails/day free
+QR Code             qrcode (npm)            Free, open source
+Photo Capture       Browser Webcam API      Native, no cost
+Cron Jobs           Vercel Cron             2 jobs/day on free tier
+Validation          Zod                     Free, open source
+Date Handling       date-fns + date-fns-tz  Free, handles IST timezone
+Deployment          Vercel                  Free forever for this scale
+
+SKIPPED / NOT USED:
+- WhatsApp / SMS notifications (no reliable free option)
+- PDF receipts (replaced by styled HTML email)
+- Facial recognition for attendance (attendance feature removed)
+- Payment gateway / Razorpay (UPI QR only, manual confirmation)
+- Multiple staff / role-based access (single owner only)
+- Multi-branch support (single branch for now)
+
+
+--------------------------------------------------------
+3. CORE FEATURES (CONFIRMED)
+--------------------------------------------------------
+
+A. MEMBER MANAGEMENT
+   - Add member: full name, mobile, email, date of birth, gender, address
+   - Emergency contact name + phone
+   - Photo: capture via webcam OR upload from file
+     → Compress image client-side (Canvas API) before upload to Supabase Storage
+     → Compressed target: ~150KB per photo (not raw 2-3MB)
+   - Auto-generate member code: GYM-001, GYM-002...
+     → Counter stored in DB (not COUNT(*)) to prevent gaps on deactivation
+   - Edit member details
+   - Soft deactivate member (never hard delete, set is_active = false)
+   - View full member profile page
+   - Admin notes field per member
+
+B. MEMBER LIST & SEARCH
+   - Paginated list: 20 members per page
+   - Search by name OR mobile number (client-side if <500 members)
+   - Filter by: all / active / expired / expiring soon
+   - Show member photo thumbnail, name, code, plan, expiry status
+
+C. MEMBERSHIP & FEES
+   - Assign plan: Monthly (1mo) / Quarterly (3mo) / Half-Yearly (6mo) / Annual (12mo)
+   - Fee per membership is CUSTOM — admin enters actual negotiated amount each time
+     → Plans only define duration, not a fixed price
+   - Early renewal: new membership start_date = old membership end_date + 1 day
+     → Auto-calculated in UI, admin cannot enter wrong dates accidentally
+   - Multiple active memberships ALLOWED but admin shown a warning:
+     "This member already has an active membership until [date]. Continue?"
+   - Membership STATUS is always calculated on-read (compare end_date with today IST)
+     → NEVER rely on a stored status column for showing active/expired
+     → Cron only updates status column for email trigger logic, not for display
+   - Membership status values: active / expiring_soon (≤7 days) / expired / cancelled
+
+D. PAYMENTS
+   - Two modes:
+     1. CASH: Admin collects physically, clicks "Mark as Paid" button
+     2. UPI: System shows QR code with amount pre-filled
+        → UPI string: upi://pay?pa=PLACEHOLDER_UPI@bank&pn=SM+FITNESS&am=AMOUNT&cu=INR
+        → Admin confirms payment after member pays, clicks "Confirm Payment"
+   - One-time payment per membership (no partial payments)
+   - Auto-generate receipt number: RCP-2026-0001
+     → Yearly reset: RCP-2027-0001 on Jan 1
+     → Counter stored in DB per year
+   - Payment modes: cash / upi
+   - Optional UPI reference / UTR number field (admin can note it down)
+   - Admin notes field per payment
+
+E. EMAIL NOTIFICATIONS (Nodemailer + Gmail SMTP)
+   Trigger                 Email Type          Notes
+   -------------------     ----------------    ---------------------------
+   Member registered       Welcome email       Sent immediately on registration
+   Payment recorded        Receipt email       Styled HTML, sent immediately
+   7 days before expiry    Reminder email      Sent by daily cron at 8AM IST
+   1 day before expiry     Urgent reminder     Sent by daily cron at 8AM IST
+   Day of expiry           Expired notice      Sent by daily cron at 8AM IST
+
+   - All emails logged in email_logs table to prevent duplicates
+   - If email fails: logged as status=failed, admin can retry via "Resend Email" button
+   - Starting config: developer's Gmail for testing
+   - Production: replace with gym owner's Gmail SMTP credentials in env vars
+   - Receipt format: styled HTML email (NOT PDF) — gym logo, member name,
+     plan, amount, dates, receipt number, payment mode
+
+F. ADMIN DASHBOARD
+   - Summary cards: total members, active members, expired, new this month
+   - Revenue card: this month total vs last month total
+   - Alert banner: members expiring in next 7 days (with count + list)
+   - Upcoming renewals table: next 7 days (name, plan, expiry date, action button)
+   - Recent payments feed: last 10 payments
+   - Quick action buttons: Add Member, Record Payment
+
+G. REPORTS & EXPORT
+   - Export full member list as CSV (name, mobile, email, plan, expiry, status)
+   - Monthly revenue summary (month-wise totals, payment mode breakdown)
+   - "Backup Reminder" notice visible in Reports page:
+     "Free tier has no automatic backup. Export member data monthly."
+
+H. AUTH & SECURITY
+   - Single admin login: email + password via Supabase Auth
+   - Session managed by Supabase (auto token refresh)
+   - Protected routes: unauthenticated users redirected to /login
+   - Auto logout after 30 minutes of inactivity
+   - Supabase RLS (Row Level Security) enabled on ALL tables
+     → Policy: only authenticated admin UID can read/write
+   - Input validation using Zod on every API route (server-side)
+   - Input validation on all forms (client-side, Zod + react-hook-form)
+
+I. CRON JOBS (Vercel Cron — runs at 8AM IST daily)
+   Job 1: /api/cron/reminders
+     → Query memberships expiring in 7 days → send reminder_7d email (if not sent)
+     → Query memberships expiring in 1 day  → send reminder_1d email (if not sent)
+     → Query memberships expired today      → send expired email (if not sent)
+     → Check email_logs for duplicates before sending
+   
+   Job 2: /api/cron/ping
+     → SELECT 1 from Supabase every 3 days
+     → Prevents Supabase free project from pausing after 7 days inactivity
+
+J. PRINT RECEIPT (FALLBACK)
+   - "Print Receipt" button on payment confirmation screen
+   - Opens browser print dialog with styled receipt layout
+   - Covers case where member has no email or email delivery fails
+
+K. UX DETAILS
+   - Confirmation dialogs on all destructive actions:
+     Deactivate member / Cancel membership / Delete payment record
+   - Loading states on all async operations (API calls, photo upload, email send)
+   - Toast notifications for success/error on all actions
+   - Empty states with helpful messages (no members yet, no payments, etc.)
+   - Mobile-responsive layout (admin may use tablet at gym counter)
+
+
+--------------------------------------------------------
+4. DATABASE SCHEMA (FINAL)
+--------------------------------------------------------
+
+TABLE: plans
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  name             TEXT NOT NULL              -- Monthly, Quarterly, Half-Yearly, Annual
+  duration_months  INT NOT NULL               -- 1, 3, 6, 12
+  is_active        BOOLEAN DEFAULT true
+  created_at       TIMESTAMPTZ DEFAULT now()
+
+  SEED DATA:
+    ('Monthly', 1), ('Quarterly', 3), ('Half-Yearly', 6), ('Annual', 12)
+
+TABLE: members
+  id                        UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  member_code               TEXT UNIQUE NOT NULL      -- GYM-001, GYM-002
+  full_name                 TEXT NOT NULL
+  mobile                    TEXT NOT NULL
+  email                     TEXT
+  date_of_birth             DATE
+  gender                    TEXT                      -- male / female / other
+  address                   TEXT
+  emergency_contact_name    TEXT
+  emergency_contact_phone   TEXT
+  photo_url                 TEXT                      -- Supabase Storage URL
+  is_active                 BOOLEAN DEFAULT true
+  notes                     TEXT
+  created_at                TIMESTAMPTZ DEFAULT now()
+  updated_at                TIMESTAMPTZ DEFAULT now()
+
+TABLE: member_code_counter
+  id       INT PRIMARY KEY DEFAULT 1
+  counter  INT DEFAULT 0
+  -- Single row, increment atomically when adding member
+  -- member_code = 'GYM-' || LPAD(counter::TEXT, 3, '0')
+
+TABLE: memberships
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  member_id     UUID NOT NULL REFERENCES members(id)
+  plan_id       UUID NOT NULL REFERENCES plans(id)
+  fee_charged   NUMERIC(10,2) NOT NULL    -- custom fee entered by admin
+  start_date    DATE NOT NULL
+  end_date      DATE NOT NULL
+  status        TEXT DEFAULT 'active'     -- active / expired / cancelled
+                                          -- NOTE: always recalculate on read, don't trust this alone
+  created_by    UUID REFERENCES admins(id)
+  created_at    TIMESTAMPTZ DEFAULT now()
+
+TABLE: payments
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  membership_id   UUID NOT NULL REFERENCES memberships(id)
+  member_id       UUID NOT NULL REFERENCES members(id)
+  amount          NUMERIC(10,2) NOT NULL
+  payment_mode    TEXT NOT NULL           -- cash / upi
+  payment_date    TIMESTAMPTZ DEFAULT now()
+  upi_ref         TEXT                    -- optional UTR / reference number
+  receipt_number  TEXT UNIQUE NOT NULL    -- RCP-2026-0001
+  email_sent      BOOLEAN DEFAULT false
+  notes           TEXT
+  created_by      UUID REFERENCES admins(id)
+  created_at      TIMESTAMPTZ DEFAULT now()
+
+TABLE: receipt_counter
+  id     INT PRIMARY KEY DEFAULT 1
+  year   INT NOT NULL
+  counter INT DEFAULT 0
+  -- Reset counter to 0 when year changes
+  -- receipt_number = 'RCP-' || year || '-' || LPAD(counter::TEXT, 4, '0')
+
+TABLE: email_logs
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid()
+  member_id   UUID NOT NULL REFERENCES members(id)
+  type        TEXT NOT NULL    -- welcome / receipt / reminder_7d / reminder_1d / expired
+  sent_to     TEXT NOT NULL    -- email address at time of sending
+  status      TEXT NOT NULL    -- sent / failed
+  error_msg   TEXT             -- error message if failed
+  sent_at     TIMESTAMPTZ DEFAULT now()
+  membership_id UUID REFERENCES memberships(id)  -- for reminder/expiry types
+
+TABLE: admins
+  id          UUID PRIMARY KEY      -- matches Supabase Auth user id
+  name        TEXT NOT NULL
+  email       TEXT NOT NULL
+  role        TEXT DEFAULT 'owner'  -- owner / staff (staff for future use)
+  created_at  TIMESTAMPTZ DEFAULT now()
+
+SUPABASE STORAGE:
+  Bucket name: member-photos
+  Access: private (only accessible via signed URLs)
+  Path pattern: members/{member_id}/photo.jpg
+  Max file size: 2MB (after compression should be ~150KB)
+
+
+--------------------------------------------------------
+5. FOLDER STRUCTURE
+--------------------------------------------------------
+
+sm-fitness/
+├── app/
+│   ├── (auth)/
+│   │   └── login/
+│   │       └── page.tsx
+│   ├── (dashboard)/
+│   │   ├── layout.tsx              ← Protected layout, session check, auto-logout
+│   │   ├── page.tsx                ← Dashboard home
+│   │   ├── members/
+│   │   │   ├── page.tsx            ← Member list with search + pagination
+│   │   │   ├── new/
+│   │   │   │   └── page.tsx        ← Add new member form
+│   │   │   └── [id]/
+│   │   │       ├── page.tsx        ← Member profile
+│   │   │       └── edit/
+│   │   │           └── page.tsx    ← Edit member details
+│   │   ├── memberships/
+│   │   │   └── new/
+│   │   │       └── page.tsx        ← Assign / renew membership for a member
+│   │   ├── payments/
+│   │   │   ├── page.tsx            ← Payment history list
+│   │   │   └── [id]/
+│   │   │       └── page.tsx        ← Payment detail + resend email button
+│   │   └── reports/
+│   │       └── page.tsx            ← CSV export + revenue summary
+│   └── api/
+│       ├── members/
+│       │   ├── route.ts            ← GET list, POST create
+│       │   └── [id]/
+│       │       └── route.ts        ← GET, PATCH, DELETE(soft)
+│       ├── memberships/
+│       │   └── route.ts            ← POST create membership
+│       ├── payments/
+│       │   ├── route.ts            ← GET list, POST create
+│       │   └── [id]/
+│       │       └── resend/
+│       │           └── route.ts    ← POST resend receipt email
+│       ├── email/
+│       │   └── route.ts            ← Internal email sender
+│       └── cron/
+│           ├── reminders/
+│           │   └── route.ts        ← Daily expiry reminder job
+│           └── ping/
+│               └── route.ts        ← Supabase keep-alive ping
+├── components/
+│   ├── members/
+│   │   ├── MemberForm.tsx          ← Add/edit form with Zod validation
+│   │   ├── MemberCard.tsx          ← Member list item
+│   │   └── PhotoCapture.tsx        ← Webcam + upload + compression
+│   ├── memberships/
+│   │   ├── MembershipForm.tsx      ← Assign plan, enter fee, dates
+│   │   └── MembershipBadge.tsx     ← Active/expiring/expired status badge
+│   ├── payments/
+│   │   ├── PaymentForm.tsx         ← Cash or UPI selection
+│   │   ├── UPIQRModal.tsx          ← QR code display modal
+│   │   └── ReceiptPrint.tsx        ← Print-ready receipt layout
+│   ├── email/
+│   │   ├── WelcomeEmail.tsx        ← HTML email template
+│   │   ├── ReceiptEmail.tsx        ← HTML email template
+│   │   └── ReminderEmail.tsx       ← HTML email template (7d/1d/expired)
+│   ├── dashboard/
+│   │   ├── StatsCards.tsx
+│   │   ├── ExpiryAlerts.tsx
+│   │   └── RecentPayments.tsx
+│   └── ui/
+│       ├── ConfirmDialog.tsx        ← Reusable confirmation modal
+│       ├── Toast.tsx
+│       ├── Pagination.tsx
+│       └── SearchInput.tsx
+├── lib/
+│   ├── supabase.ts                 ← Supabase client (server + client)
+│   ├── mailer.ts                   ← Nodemailer config
+│   ├── memberCode.ts               ← Generate GYM-001 codes
+│   ├── receiptNumber.ts            ← Generate RCP-2026-0001 numbers
+│   ├── dateUtils.ts                ← IST timezone helpers (date-fns-tz)
+│   ├── imageCompress.ts            ← Client-side photo compression
+│   └── validations/
+│       ├── member.schema.ts        ← Zod schemas
+│       ├── membership.schema.ts
+│       └── payment.schema.ts
+├── public/
+│   ├── manifest.json               ← PWA manifest
+│   ├── icons/                      ← PWA icons (various sizes)
+│   └── models/                     ← face-api.js model files (loaded lazily)
+│       ├── tiny_face_detector_model-weights_manifest.json
+│       └── ... (other model files)
+├── .env.local                      ← Never commit this
+├── vercel.json                     ← Cron job schedule config
+└── middleware.ts                   ← Auth protection for dashboard routes
+
+
+--------------------------------------------------------
+6. ENVIRONMENT VARIABLES (.env.local)
+--------------------------------------------------------
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=          ← Server only, never expose to client
+
+GMAIL_USER=your.email@gmail.com
+GMAIL_APP_PASSWORD=                 ← Gmail App Password (not account password)
+                                    → Enable 2FA → App Passwords → Generate
+
+NEXT_PUBLIC_UPI_ID=PLACEHOLDER@upi  ← Replace with owner's UPI ID
+NEXT_PUBLIC_GYM_NAME=SM FITNESS
+
+CRON_SECRET=                        ← Random string, verify in cron routes
+
+
+--------------------------------------------------------
+7. VERCEL CRON CONFIG (vercel.json)
+--------------------------------------------------------
+{
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "30 2 * * *"      ← 8:00 AM IST = 2:30 AM UTC
+    },
+    {
+      "path": "/api/cron/ping",
+      "schedule": "0 6 */3 * *"     ← Every 3 days at 6AM UTC
+    }
+  ]
+}
+
+
+--------------------------------------------------------
+8. CRITICAL IMPLEMENTATION NOTES
+--------------------------------------------------------
+
+TIMEZONE (MOST IMPORTANT):
+- All date comparisons must use IST (UTC+5:30)
+- Use date-fns-tz: toZonedTime(utcDate, 'Asia/Kolkata')
+- When storing dates: store as DATE (not TIMESTAMPTZ) for membership start/end
+- Cron scheduled at 2:30 AM UTC = 8:00 AM IST
+
+MEMBERSHIP STATUS LOGIC:
+  const today = toZonedTime(new Date(), 'Asia/Kolkata')
+  if end_date < today           → 'expired'
+  if end_date <= today + 7 days → 'expiring_soon'
+  else                          → 'active'
+  NEVER display status from DB column alone
+
+PHOTO UPLOAD FLOW:
+  1. Webcam captures frame OR user selects file
+  2. Compress to <200KB using Canvas API (imageCompress.ts)
+  3. Upload compressed blob to Supabase Storage: members/{id}/photo.jpg
+  4. Get public/signed URL, save to members.photo_url
+
+MEMBER CODE GENERATION:
+  1. BEGIN transaction
+  2. UPDATE member_code_counter SET counter = counter + 1 RETURNING counter
+  3. Format: 'GYM-' + counter.toString().padStart(3, '0')
+  4. COMMIT
+  (atomic — no race conditions, no gaps)
+
+RECEIPT NUMBER GENERATION:
+  Same pattern with receipt_counter table
+  Check if current year matches stored year; if not, reset counter to 0
+  Format: 'RCP-' + year + '-' + counter.toString().padStart(4, '0')
+
+EARLY RENEWAL DATE CALCULATION:
+  newStartDate = addDays(existingMembership.end_date, 1)
+  newEndDate = addMonths(newStartDate, plan.duration_months)
+  Show both dates to admin before confirmation
+
+MULTIPLE MEMBERSHIP WARNING:
+  Before creating membership, query:
+    SELECT * FROM memberships
+    WHERE member_id = ? AND end_date >= today
+  If results found, show warning modal — don't block, just warn
+
+SUPABASE RLS POLICIES (apply to ALL tables):
+  CREATE POLICY "admin_only" ON table_name
+    FOR ALL USING (auth.uid() = (SELECT id FROM admins LIMIT 1));
+
+EMAIL DUPLICATE PREVENTION:
+  Before sending any cron email, query email_logs:
+    SELECT id FROM email_logs
+    WHERE member_id = ? AND type = ? AND membership_id = ?
+    AND DATE(sent_at) = today
+  Only send if no record found
+
+FACE-API.JS MODELS:
+  - Place all model files in /public/models/
+  - Load ONLY when PhotoCapture component mounts
+  - Use dynamic import: const faceapi = await import('@vladmandic/face-api')
+  - Don't import at page level — wastes 6MB on every page
+
+AUTO LOGOUT:
+  Track last activity timestamp in localStorage
+  On each route change, check if (now - lastActivity) > 30 minutes
+  If yes, call supabase.auth.signOut() and redirect to /login
+  Reset lastActivity on any user interaction
+
+
+--------------------------------------------------------
+9. BUILD ORDER FOR AI AGENT
+--------------------------------------------------------
+Follow this exact sequence. Each step is independently testable.
+Complete and verify each step before moving to the next.
+
+STEP 1: PROJECT SETUP
+  - Create Next.js project with App Router + TypeScript + Tailwind
+  - Install all dependencies
+  - Configure .env.local
+  - Set up Supabase project, run full schema SQL
+  - Enable RLS policies on all tables
+  - Create Supabase Storage bucket (member-photos, private)
+  - Seed plans table
+
+STEP 2: AUTH
+  - Login page UI
+  - Supabase Auth integration
+  - Protected dashboard layout with middleware
+  - Auto logout after 30 min inactivity
+  - Create admin record in admins table on first login
+
+STEP 3: MEMBER CRUD
+  - Member list page (paginated, 20/page)
+  - Search by name and mobile
+  - Add member form with Zod validation
+  - Edit member form
+  - Soft deactivate with confirmation dialog
+  - Member profile page
+  - Member code auto-generation (via DB counter)
+
+STEP 4: PHOTO CAPTURE
+  - PhotoCapture component: webcam mode + file upload mode
+  - Client-side compression (Canvas API, target <200KB)
+  - Upload to Supabase Storage
+  - Display photo on member profile
+
+STEP 5: MEMBERSHIP FLOW
+  - Assign membership form (plan + fee + dates)
+  - Early renewal date auto-calculation
+  - Multiple membership warning modal
+  - Membership status badge (calculated on-read with IST)
+
+STEP 6: PAYMENT FLOW
+  - Payment form: cash vs UPI selection
+  - UPI QR modal (qrcode library, pre-filled amount)
+  - Mark as paid flow (cash) and confirm payment flow (UPI)
+  - Receipt number auto-generation (via DB counter, yearly reset)
+  - Payment history list
+
+STEP 7: EMAIL SETUP
+  - Nodemailer + Gmail SMTP configuration
+  - HTML email templates: Welcome, Receipt, Reminder (7d/1d), Expired
+  - Test all templates
+  - Email logs table integration
+  - Resend email button on payment detail
+
+STEP 8: CRON JOBS
+  - /api/cron/reminders route (with CRON_SECRET verification)
+  - Daily reminder logic (7d, 1d, expired) with duplicate prevention
+  - /api/cron/ping route (Supabase keep-alive)
+  - vercel.json cron schedule config
+
+STEP 9: DASHBOARD
+  - Stats cards (total, active, expired, revenue)
+  - Expiry alerts banner
+  - Upcoming renewals table
+  - Recent payments feed
+
+STEP 10: REPORTS
+  - CSV export (member list)
+  - Monthly revenue summary
+  - Backup reminder notice
+
+STEP 11: PRINT RECEIPT
+  - Print-friendly receipt layout
+  - window.print() trigger button on payment confirmation
+
+STEP 12: PWA
+  - manifest.json
+  - Icons (use realfavicongenerator.net)
+  - Service worker (Next.js built-in PWA support)
+  - "Add to Home Screen" prompt
+
+
+--------------------------------------------------------
+10. KNOWN CONSTRAINTS & LIMITS
+--------------------------------------------------------
+Constraint                          Impact / Mitigation
+---------------------------------   ------------------------------------------
+Gmail SMTP 500 emails/day           Fine for gym <300 members
+Supabase free pauses in 7 days      Solved by /api/cron/ping every 3 days
+Supabase free: no auto backup       Manual CSV export monthly, reminder in UI
+Vercel Cron: 2 jobs/day free        Both jobs fit (reminders + ping)
+No payment auto-confirmation        Admin manually confirms UPI — by design
+Supabase Storage 1GB free           ~6,000 compressed photos — enough for years
+face-api.js 6MB model files         Load lazily on photo screen only
+UPI QR: no webhook                  Manual confirmation flow — acceptable for gym
+
+
+--------------------------------------------------------
+11. FUTURE ENHANCEMENTS (NOT IN V1)
+--------------------------------------------------------
+- Multi-staff login with roles (owner / receptionist)
+- Multi-branch support
+- WhatsApp notifications (when free solution matures)
+- Automatic UPI payment confirmation (requires paid gateway)
+- Member self-service portal (view own membership, download receipt)
+- Bulk member import via CSV
+- Expense tracking (not just revenue)
+- Inventory management (supplements, merchandise)
+- Advanced reports (monthly trends, retention rate)
+
+
+--------------------------------------------------------
+12. PROMPTING GUIDE FOR AI AGENT
+--------------------------------------------------------
+When instructing AI agent for each step, use this format:
+
+---
+CONTEXT: [paste relevant section from this document]
+TASK: [specific task for this step only]
+RULES:
+  - Read-only analysis phase first, no code changes
+  - Show me the plan before implementing
+  - One file at a time
+  - Run lint/type-check after each file
+  - Do not modify files outside the scope of this task
+DONE WHEN: [specific acceptance criteria]
+---
+
+Always share the relevant DB schema section and folder structure
+when asking the agent to create API routes or components.
+Never start a new step until the previous step's acceptance criteria are met.
+
+
+========================================================
+END OF DOCUMENT
+========================================================
