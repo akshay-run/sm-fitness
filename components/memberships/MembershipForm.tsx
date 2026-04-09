@@ -1,0 +1,137 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+
+const schema = z.object({
+  plan_id: z.string().uuid("Select a plan"),
+  fee_charged: z.coerce.number().positive("Enter a valid fee"),
+});
+
+type Plan = { id: string; name: string; duration_months: number };
+
+export function MembershipForm({
+  memberId,
+  plans,
+  onCreated,
+}: {
+  memberId: string;
+  plans: Plan[];
+  onCreated: (created: { id: string; start_date: string; end_date: string }) => void;
+}) {
+  const [planId, setPlanId] = useState(plans[0]?.id ?? "");
+  const [fee, setFee] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+
+  const selected = useMemo(
+    () => plans.find((p) => p.id === planId) ?? null,
+    [plans, planId]
+  );
+
+  useEffect(() => {
+    if (!planId && plans[0]?.id) setPlanId(plans[0].id);
+  }, [planId, plans]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setWarning(null);
+
+    const parsed = schema.safeParse({ plan_id: planId, fee_charged: fee });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/memberships", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          member_id: memberId,
+          plan_id: parsed.data.plan_id,
+          fee_charged: parsed.data.fee_charged,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to create membership");
+
+      if (json?.warning_active_until) {
+        setWarning(
+          `This member already had an active membership until ${json.warning_active_until}. New membership starts after that date.`
+        );
+      }
+
+      onCreated({ id: json.id, start_date: json.start_date, end_date: json.end_date });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create membership");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-800">Plan</label>
+          <select
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            value={planId}
+            onChange={(e) => setPlanId(e.target.value)}
+            disabled={submitting}
+          >
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.duration_months} mo)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-zinc-800">Fee charged</label>
+          <input
+            inputMode="decimal"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            value={fee}
+            onChange={(e) => setFee(e.target.value)}
+            disabled={submitting}
+            placeholder="e.g. 1200"
+            required
+          />
+        </div>
+      </div>
+
+      {selected ? (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+          Dates are auto-calculated based on existing active membership (if any).
+        </div>
+      ) : null}
+
+      {warning ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {warning}
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+      >
+        {submitting ? "Creating..." : "Create membership"}
+      </button>
+    </form>
+  );
+}
+

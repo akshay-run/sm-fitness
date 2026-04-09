@@ -1,0 +1,102 @@
+issue 0: 
+Console Error
+
+
+A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+See more info here: https://nextjs.org/docs/messages/react-hydration-error
+
+
++
+Client
+-
+Server
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="en" className="geist_a715...">
+                          <body
+                            className="min-h-full flex flex-col"
+-                           __processed_0241064c-4e5c-4af2-b38f-873eafecc15f__="true"
+-                           bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWll..."
+                          >
+                  ...
+app\layout.tsx (38:7) @ RootLayout
+
+
+  36 |       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+  37 |     >
+> 38 |       <body className="min-h-full flex flex-col">
+     |       ^
+  39 |         <SWRegister />
+  40 |         <InstallPrompt />
+  41 |         {children}
+Call Stack
+18
+
+Show 16 ignore-listed frame(s)
+body
+<anonymous>
+RootLayout
+app\layout.tsx (38:7)
+
+issue 1:while creating new member showing red erro: failed to create member
+network:
+header;Request URL:http://localhost:3000/api/members
+Request Method:POST
+Status Code:500 Internal Server Error
+Remote Address:[::1]:300
+
+payload:
+{full_name: "Shubham Nikule", mobile: "8087234723", email: "shubhamnikule1404@gmail.com",…}
+address
+: 
+"harsul, chetana nagar"
+date_of_birth
+: 
+"2005-07-09"
+email
+: 
+"shubhamnikule1404@gmail.com"
+emergency_contact_name
+: 
+""
+full_name
+: 
+"Shubham Nikule"
+gender
+: 
+"male"
+mobile
+: 
+"8087234723"
+notes
+: 
+""
+
+console: requests.js:1  POST http://localhost:3000/api/members 500 (Internal Server Error)
+
+
+issue 3: Could not find the table 'public.members' in the schema cache
