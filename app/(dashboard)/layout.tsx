@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { AutoLogout } from "@/components/auth/AutoLogout";
+import { DashboardSidebar } from "@/components/navigation/DashboardSidebar";
 
 export default async function DashboardLayout({
   children,
@@ -32,9 +33,9 @@ export default async function DashboardLayout({
   if (!adminRow) redirect("/login");
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50">
+    <div className="min-h-screen bg-zinc-50">
       <AutoLogout />
-      <div className="flex-1">{children}</div>
+      <DashboardSidebar>{children}</DashboardSidebar>
     </div>
   );
 }

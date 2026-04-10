@@ -95,6 +95,7 @@ async function handleType({
     await supabaseAdmin
       .from("memberships")
       .update({ status: "expired" })
+      .neq("status", "cancelled")
       .eq("end_date", targetEndDate);
   }
 

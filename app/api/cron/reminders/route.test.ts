@@ -31,7 +31,9 @@ function createCronSupabaseMock() {
             }),
           }),
           update: () => ({
-            eq: async () => ({ data: null, error: null }),
+            neq: () => ({
+              eq: async () => ({ data: null, error: null }),
+            }),
           }),
         };
       }
