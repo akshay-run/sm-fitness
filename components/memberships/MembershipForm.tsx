@@ -77,9 +77,13 @@ export function MembershipForm({
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800">Plan</label>
+          <label className="text-sm font-medium text-zinc-800" htmlFor="plan_id">
+            Plan
+          </label>
           <select
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            id="plan_id"
+            aria-invalid={!!error}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={planId}
             onChange={(e) => setPlanId(e.target.value)}
             disabled={submitting}
@@ -93,10 +97,14 @@ export function MembershipForm({
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800">Fee charged</label>
+          <label className="text-sm font-medium text-zinc-800" htmlFor="fee_charged">
+            Fee charged
+          </label>
           <input
+            id="fee_charged"
             inputMode="decimal"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            aria-invalid={!!error}
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={fee}
             onChange={(e) => setFee(e.target.value)}
             disabled={submitting}

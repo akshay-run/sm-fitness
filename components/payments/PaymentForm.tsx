@@ -133,20 +133,25 @@ export function PaymentForm({
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-800">
+                <label className="text-sm font-medium text-zinc-800" htmlFor="upi_ref">
                   UPI Ref / UTR (optional)
                 </label>
                 <input
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                  id="upi_ref"
+                  aria-invalid={!!error}
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                   value={upiRef}
                   onChange={(e) => setUpiRef(e.target.value)}
                   disabled={submitting}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-sm font-medium text-zinc-800">Notes (optional)</label>
+                <label className="text-sm font-medium text-zinc-800" htmlFor="upi_notes">
+                  Notes (optional)
+                </label>
                 <input
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                  id="upi_notes"
+                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={submitting}
@@ -157,9 +162,12 @@ export function PaymentForm({
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-800">Notes (optional)</label>
+              <label className="text-sm font-medium text-zinc-800" htmlFor="cash_notes">
+                Notes (optional)
+              </label>
               <input
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+                id="cash_notes"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={submitting}

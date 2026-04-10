@@ -111,11 +111,15 @@ export default function MembersPage() {
             navigate({ q: inputQ, page: 1 });
           }}
         >
+          <label htmlFor="members-search" className="sr-only">
+            Search members by name or mobile
+          </label>
           <input
+            id="members-search"
             value={inputQ}
             onChange={(e) => setInputQ(e.target.value)}
             placeholder="Search name or mobile"
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           />
           <button
             type="submit"

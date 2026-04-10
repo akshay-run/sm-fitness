@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { internalServerError } from "@/lib/apiError";
 
 function csvEscape(v: unknown) {
   const s = String(v ?? "");
@@ -47,7 +48,7 @@ export async function GET() {
     .from("members")
     .select("id, full_name, mobile, email, is_active")
     .order("created_at", { ascending: false });
-  if (memError) return new Response(memError.message, { status: 500 });
+  if (memError) return internalServerError("Failed to generate members CSV");
 
   const rows: string[] = [];
   rows.push(["name", "mobile", "email", "plan", "expiry", "status"].join(","));

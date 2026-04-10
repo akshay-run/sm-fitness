@@ -6,6 +6,7 @@ import { createMemberSchema } from "@/lib/validations/member.schema";
 import { getNextMemberCode } from "@/lib/memberCode";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
 import { renderWelcomeEmail } from "@/components/email/WelcomeEmail";
+import { internalServerError } from "@/lib/apiError";
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
@@ -53,7 +54,7 @@ export async function GET(req: Request) {
   }
 
   const { data, error: dbError, count } = await query.range(from, to);
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) return internalServerError("Failed to load members");
 
   return NextResponse.json({
     items: data ?? [],
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
     .select("id, member_code, full_name, email")
     .single();
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) return internalServerError("Failed to create member");
 
   // Welcome email (optional if email exists), duplicate-prevented via email_logs.
   if (data.email) {

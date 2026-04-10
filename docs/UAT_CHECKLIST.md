@@ -14,6 +14,7 @@ Use this checklist before production release.
 
 - [ ] Valid admin login works.
 - [ ] Invalid login is rejected.
+- [ ] Non-admin authenticated account is denied and signed out.
 - [ ] Dashboard routes redirect to `/login` when unauthenticated.
 - [ ] Protected API routes return `401` when unauthenticated.
 - [ ] Auto-logout behavior verified.
@@ -33,6 +34,7 @@ Use this checklist before production release.
 - [ ] Camera capture path works.
 - [ ] Compression target is under ~200KB for common images.
 - [ ] Camera permission denial handled gracefully.
+- [ ] Supabase image host renders correctly in preview (no `next/image` host error).
 
 ## 5) Memberships
 
@@ -64,6 +66,7 @@ Use this checklist before production release.
 - [ ] `/api/cron/reminders` runs with valid secret.
 - [ ] 7-day / 1-day / expired reminders trigger correctly by IST date.
 - [ ] Duplicate cron sends are prevented per day/type/membership.
+- [ ] Cancelled memberships are never updated to `expired` by cron status update.
 - [ ] `/api/cron/ping` returns healthy response.
 - [ ] Invalid/missing cron secret returns unauthorized.
 

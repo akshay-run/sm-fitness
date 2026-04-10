@@ -53,9 +53,11 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Full name" required>
+        <Field label="Full name" required htmlFor="full_name">
           <input
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            id="full_name"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            aria-invalid={!!error}
             value={form.full_name}
             onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
             disabled={submitting}
@@ -63,10 +65,12 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
           />
         </Field>
 
-        <Field label="Mobile" required hint="10 digits">
+        <Field label="Mobile" required hint="10 digits" htmlFor="mobile">
           <input
+            id="mobile"
             inputMode="numeric"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            aria-invalid={!!error}
             value={form.mobile}
             onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
             disabled={submitting}
@@ -74,29 +78,32 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
           />
         </Field>
 
-        <Field label="Email (optional)">
+        <Field label="Email (optional)" htmlFor="email">
           <input
+            id="email"
             type="email"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={form.email ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             disabled={submitting}
           />
         </Field>
 
-        <Field label="Date of birth (optional)">
+        <Field label="Date of birth (optional)" htmlFor="date_of_birth">
           <input
+            id="date_of_birth"
             type="date"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={form.date_of_birth ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
             disabled={submitting}
           />
         </Field>
 
-        <Field label="Gender (optional)">
+        <Field label="Gender (optional)" htmlFor="gender">
           <select
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            id="gender"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={form.gender ?? ""}
             onChange={(e) =>
               setForm((f) => ({
@@ -114,9 +121,10 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
         </Field>
       </div>
 
-      <Field label="Address (optional)">
+      <Field label="Address (optional)" htmlFor="address">
         <textarea
-          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+          id="address"
+          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           rows={3}
           value={form.address ?? ""}
           onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
@@ -125,9 +133,10 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Emergency contact name (optional)">
+        <Field label="Emergency contact name (optional)" htmlFor="emergency_contact_name">
           <input
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            id="emergency_contact_name"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={form.emergency_contact_name ?? ""}
             onChange={(e) =>
               setForm((f) => ({ ...f, emergency_contact_name: e.target.value }))
@@ -136,10 +145,15 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
           />
         </Field>
 
-        <Field label="Emergency contact phone (optional)" hint="10 digits">
+        <Field
+          label="Emergency contact phone (optional)"
+          hint="10 digits"
+          htmlFor="emergency_contact_phone"
+        >
           <input
+            id="emergency_contact_phone"
             inputMode="numeric"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
             value={form.emergency_contact_phone ?? ""}
             onChange={(e) =>
               setForm((f) => ({ ...f, emergency_contact_phone: e.target.value }))
@@ -149,9 +163,10 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
         </Field>
       </div>
 
-      <Field label="Admin notes (optional)">
+      <Field label="Admin notes (optional)" htmlFor="notes">
         <textarea
-          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+          id="notes"
+          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           rows={4}
           value={form.notes ?? ""}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
@@ -180,17 +195,19 @@ function Field({
   label,
   required,
   hint,
+  htmlFor,
   children,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <label className="text-sm font-medium text-zinc-800">
+        <label className="text-sm font-medium text-zinc-800" htmlFor={htmlFor}>
           {label} {required ? <span className="text-red-600">*</span> : null}
         </label>
         {hint ? <span className="text-xs text-zinc-500">{hint}</span> : null}

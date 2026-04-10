@@ -11,7 +11,6 @@ type Props = {
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", short: "DB" },
   { href: "/members", label: "Members", short: "MB" },
-  { href: "/memberships/new", label: "Memberships", short: "MS" },
   { href: "/payments", label: "Payments", short: "PY" },
   { href: "/reports", label: "Reports", short: "RP" },
 ] as const;
@@ -69,6 +68,7 @@ export function DashboardSidebar({ children }: Props) {
                 href={item.href}
                 className={itemClass(isActive, collapsed)}
                 title={collapsed ? item.label : undefined}
+                aria-current={isActive ? "page" : undefined}
               >
                 <span className="text-xs font-semibold">{item.short}</span>
                 {!collapsed ? <span>{item.label}</span> : null}
@@ -124,6 +124,7 @@ export function DashboardSidebar({ children }: Props) {
                     href={item.href}
                     className={itemClass(isActive, false)}
                     onClick={() => setMobileOpen(false)}
+                    aria-current={isActive ? "page" : undefined}
                   >
                     <span className="text-xs font-semibold">{item.short}</span>
                     <span>{item.label}</span>

@@ -6,6 +6,7 @@ import { createPaymentSchema } from "@/lib/validations/payment.schema";
 import { getNextReceiptNumber } from "@/lib/receiptNumber";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
+import { internalServerError } from "@/lib/apiError";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
     .order("payment_date", { ascending: false })
     .range(from, to);
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) return internalServerError("Failed to load payments");
 
   return NextResponse.json({
     items: data ?? [],
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
     .eq("membership_id", membership.id);
 
   if (existingError) {
-    return NextResponse.json({ error: existingError.message }, { status: 500 });
+    return internalServerError("Failed to validate existing payment");
   }
   if ((existingCount ?? 0) > 0) {
     return NextResponse.json({ error: "Payment already exists for this membership" }, { status: 409 });
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: createError.message }, { status: 500 });
+    return internalServerError("Failed to record payment");
   }
 
   // Receipt email (optional if member email exists), duplicate-prevented via email_logs.

@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { createMembershipSchema } from "@/lib/validations/membership.schema";
 import { addDaysIST, addMonthsIST, todayISTDateString } from "@/lib/dateUtils";
+import { internalServerError } from "@/lib/apiError";
 
 export async function POST(req: Request) {
   const { user, error } = await requireUser();
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     .limit(1);
 
   if (activeError) {
-    return NextResponse.json({ error: activeError.message }, { status: 500 });
+    return internalServerError("Failed to validate membership timeline");
   }
 
   const latestActiveEndDate = activeMemberships?.[0]?.end_date
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
     .single();
 
   if (createError) {
-    return NextResponse.json({ error: createError.message }, { status: 500 });
+    return internalServerError("Failed to create membership");
   }
 
   return NextResponse.json(

@@ -13,6 +13,8 @@ export function UPIQRModal({
   onClose: () => void;
 }) {
   const [dataUrl, setDataUrl] = useState<string>("");
+  const titleId = "upi-qr-title";
+  const descriptionId = "upi-qr-description";
 
   useEffect(() => {
     let cancelled = false;
@@ -29,12 +31,20 @@ export function UPIQRModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+    >
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-zinc-900">UPI QR</h2>
-            <p className="mt-1 text-xs text-zinc-600">
+            <h2 id={titleId} className="text-base font-semibold text-zinc-900">
+              UPI QR
+            </h2>
+            <p id={descriptionId} className="mt-1 text-xs text-zinc-600">
               Ask the member to pay, then confirm.
             </p>
           </div>

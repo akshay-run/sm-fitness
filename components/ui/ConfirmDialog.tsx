@@ -21,6 +21,9 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const titleId = "confirm-dialog-title";
+  const descriptionId = "confirm-dialog-description";
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onCancel();
@@ -32,11 +35,21 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+    >
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <h2 className="text-base font-semibold text-zinc-900">{title}</h2>
+        <h2 id={titleId} className="text-base font-semibold text-zinc-900">
+          {title}
+        </h2>
         {description ? (
-          <p className="mt-2 text-sm text-zinc-600">{description}</p>
+          <p id={descriptionId} className="mt-2 text-sm text-zinc-600">
+            {description}
+          </p>
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
