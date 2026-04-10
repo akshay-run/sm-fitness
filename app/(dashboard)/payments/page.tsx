@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PaymentForm } from "@/components/payments/PaymentForm";
+import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 
 type PaymentListItem = {
   id: string;
@@ -87,7 +88,7 @@ export default function PaymentsPage() {
   }, [membershipId]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-6">
+    <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
@@ -116,9 +117,9 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      <div className="mt-8 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <div className="card-surface mt-8 overflow-hidden rounded-xl border border-zinc-200">
         <div className="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-600">
-          <div className="col-span-4">Receipt</div>
+          <div className="col-span-4">Date</div>
           <div className="col-span-3">Mode</div>
           <div className="col-span-3">Amount</div>
           <div className="col-span-2 text-right">Open</div>
@@ -134,15 +135,15 @@ export default function PaymentsPage() {
               key={p.id}
               className="grid grid-cols-12 gap-2 px-4 py-3 text-sm text-zinc-900 hover:bg-zinc-50"
             >
-              <div className="col-span-4 font-medium">{p.receipt_number}</div>
+              <div className="col-span-4 font-medium">{formatDateShortIST(p.payment_date)}</div>
               <div className="col-span-3 uppercase text-zinc-700">{p.payment_mode}</div>
-              <div className="col-span-3">₹{p.amount}</div>
+              <div className="col-span-3">{formatAmountINR(p.amount)}</div>
               <div className="col-span-2 text-right">
                 <Link
                   href={`/payments/${p.id}`}
                   className="font-medium underline underline-offset-4"
                 >
-                  Open
+                  →
                 </Link>
               </div>
             </div>

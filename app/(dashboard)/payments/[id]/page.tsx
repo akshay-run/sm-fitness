@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ReceiptPrint } from "@/components/payments/ReceiptPrint";
+import { formatAmountINR, formatDateShortIST, formatDateTimeIST } from "@/lib/uiFormat";
+import { receiptMessage, smsLink, whatsappLink } from "@/lib/messageTemplates";
 
 type Payment = {
   id: string;
@@ -18,7 +19,7 @@ type Payment = {
   created_at: string;
 };
 
-type Member = { id: string; full_name: string; member_code: string };
+type Member = { id: string; full_name: string; member_code: string; mobile: string };
 type Membership = { id: string; start_date: string; end_date: string };
 type Plan = { name: string };
 
@@ -82,7 +83,20 @@ export default function PaymentDetailPage({
   }
 
   if (!payment) return null;
-  const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
+  const planName = plan?.name ?? "Membership";
+  const shareMessage = member && membership
+    ? receiptMessage({
+        name: member.full_name,
+        receiptNo: payment.receipt_number,
+        plan: planName,
+        startDate: formatDateShortIST(membership.start_date),
+        endDate: formatDateShortIST(membership.end_date),
+        amount: Number(payment.amount),
+        mode: payment.payment_mode.toUpperCase(),
+      })
+    : "";
+  const badgeClass = payment.email_sent ? "status-success" : "status-warning";
+  const badgeText = payment.email_sent ? "Receipt email sent ✓" : "Receipt email not sent yet";
 
   return (
     <div className="mx-auto w-full max-w-3xl p-6">
@@ -104,11 +118,7 @@ export default function PaymentDetailPage({
         </Link>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4">
-        <Card label="UPI Ref / UTR" value={payment.upi_ref ?? "—"} />
-        <Card label="Email sent" value={payment.email_sent ? "Yes" : "No"} />
-        <Card label="Notes" value={payment.notes ?? "—"} />
-      </div>
+      <div className={`mt-4 inline-flex rounded px-3 py-1 text-xs ${badgeClass}`}>{badgeText}</div>
 
       {info ? (
         <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
@@ -116,11 +126,35 @@ export default function PaymentDetailPage({
         </div>
       ) : null}
 
-      <div className="mt-6 flex gap-2 print:hidden">
+      <div className="card-surface mt-6 rounded-2xl border border-zinc-200 p-5">
+        <div className="text-xl font-semibold text-[#1A1A2E]">SM FITNESS</div>
+        <div className="text-sm text-slate-500">Payment Receipt</div>
+        <div className="my-3 border-t border-zinc-200" />
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-semibold">{payment.receipt_number}</span>
+          <span>{formatDateTimeIST(payment.created_at)}</span>
+        </div>
+        <div className="my-3 border-t border-zinc-200" />
+        <div className="flex items-center justify-between text-sm">
+          <span>{member?.full_name ?? "-"}</span>
+          <span>{member?.member_code ?? "-"}</span>
+        </div>
+        <div className="my-3 border-t border-zinc-200" />
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">Plan</span><span>{planName}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Duration</span><span>{membership ? `${formatDateShortIST(membership.start_date)} → ${formatDateShortIST(membership.end_date)}` : "-"}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Amount</span><span>{formatAmountINR(payment.amount)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Mode</span><span className="uppercase">{payment.payment_mode}</span></div>
+          {payment.upi_ref ? <div className="flex justify-between"><span className="text-slate-500">UPI Ref</span><span>{payment.upi_ref}</span></div> : null}
+          {payment.notes ? <div className="flex justify-between"><span className="text-slate-500">Notes</span><span>{payment.notes}</span></div> : null}
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-2 print:hidden">
         <button
           type="button"
           onClick={() => window.print()}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          className="rounded-lg bg-[#1A1A2E] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
         >
           Print receipt
         </button>
@@ -142,36 +176,19 @@ export default function PaymentDetailPage({
           disabled={resending}
           className="rounded-lg border border-zinc-200 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
         >
-          {resending ? "Resending..." : "Resend receipt email"}
+          {resending ? "Resending..." : "📧 Resend email"}
         </button>
+        {member ? (
+          <>
+            <a href={whatsappLink(member.mobile, shareMessage)} className="status-success rounded-lg px-4 py-2 text-sm">
+              💬 WhatsApp
+            </a>
+            <a href={smsLink(member.mobile, shareMessage)} className="status-info rounded-lg px-4 py-2 text-sm">
+              📱 SMS
+            </a>
+          </>
+        ) : null}
       </div>
-
-      {member && membership ? (
-        <ReceiptPrint
-          data={{
-            gymName,
-            receiptNumber: payment.receipt_number,
-            paymentDate: payment.payment_date,
-            memberName: member.full_name,
-            memberCode: member.member_code,
-            planName: plan?.name ?? "Membership",
-            startDate: membership.start_date,
-            endDate: membership.end_date,
-            paymentMode: payment.payment_mode,
-            amount: payment.amount,
-            upiRef: payment.upi_ref,
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-      <div className="text-xs font-medium text-zinc-600">{label}</div>
-      <div className="mt-1 text-sm text-zinc-900 whitespace-pre-wrap">{value}</div>
     </div>
   );
 }

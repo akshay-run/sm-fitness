@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PhotoCapture } from "@/components/members/PhotoCapture";
+import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
+import { reminderMessage, smsLink, whatsappLink } from "@/lib/messageTemplates";
 
 type Member = {
   id: string;
@@ -24,6 +26,23 @@ type Member = {
   updated_at: string;
 };
 
+type MembershipSummary = {
+  plan_name: string | null;
+  fee_charged: number | null;
+  end_date: string | null;
+  start_date: string | null;
+  status: "active" | "expiring" | "expired" | "none";
+  days_left: number;
+};
+
+type PaymentSummary = {
+  id: string;
+  receipt_number: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: "cash" | "upi";
+};
+
 export default function MemberProfilePage({
   params,
 }: {
@@ -36,6 +55,9 @@ export default function MemberProfilePage({
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [membership, setMembership] = useState<MembershipSummary | null>(null);
+  const [recentPayments, setRecentPayments] = useState<PaymentSummary[]>([]);
+  const [info, setInfo] = useState<string | null>(null);
 
   const idPromise = useMemo(() => params, [params]);
 
@@ -53,6 +75,8 @@ export default function MemberProfilePage({
         if (!cancelled) {
           setMember(json.member);
           setPhotoSignedUrl(json.photoSignedUrl ?? null);
+          setMembership(json.membershipSummary ?? null);
+          setRecentPayments(json.recentPayments ?? []);
         }
       }
       if (!cancelled) setLoading(false);
@@ -101,6 +125,11 @@ export default function MemberProfilePage({
   }
 
   if (!member) return null;
+  const reminder = reminderMessage({
+    name: member.full_name,
+    endDate: membership?.end_date ? formatDateShortIST(membership.end_date) : "",
+    daysLeft: membership?.days_left ?? 0,
+  });
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
@@ -140,6 +169,19 @@ export default function MemberProfilePage({
         </div>
       </div>
 
+      <div className="mt-4">
+        <MembershipBanner membership={membership} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Card label="Mobile" value={member.mobile} />
+        <Card label="Email" value={member.email ?? "—"} />
+        <Card label="Plan" value={membership?.plan_name ?? "—"} />
+        <Card label="Fee paid" value={membership?.fee_charged ? formatAmountINR(membership.fee_charged) : "—"} />
+        <Card label="Member since" value={member.created_at ? formatDateShortIST(member.created_at) : "—"} />
+        <Card label="Member code" value={member.member_code} />
+      </div>
+
       <div className="mt-6">
         <PhotoCapture
           memberId={member.id}
@@ -148,18 +190,82 @@ export default function MemberProfilePage({
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card label="Mobile" value={member.mobile} />
-        <Card label="Email" value={member.email ?? "—"} />
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <a href={whatsappLink(member.mobile, reminder)} className="status-success rounded-lg px-3 py-2 text-center text-sm">
+          📱 WhatsApp
+        </a>
+        <a href={smsLink(member.mobile, reminder)} className="status-info rounded-lg px-3 py-2 text-center text-sm">
+          💬 SMS
+        </a>
+        <button
+          type="button"
+          className="status-neutral rounded-lg px-3 py-2 text-sm"
+          onClick={async () => {
+            if (!member.email) {
+              setError("Member has no email address.");
+              return;
+            }
+            const body = {
+              member_id: member.id,
+              type: "welcome",
+              to: member.email,
+              subject: `Welcome to SM FITNESS, ${member.full_name.split(" ")[0]}! 🎉`,
+              html: `<p>Hi ${member.full_name},</p><p>Thanks for being part of SM FITNESS.</p>`,
+              allow_duplicate: true,
+            };
+            const res = await fetch("/api/email", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+              const j = await res.json().catch(() => ({}));
+              setError(j?.error ?? "Failed to send email");
+            } else {
+              setInfo("Email sent successfully.");
+            }
+          }}
+        >
+          ✉️ Send Email
+        </button>
+        <Link
+          href={`/memberships/new?memberId=${member.id}`}
+          className="status-warning rounded-lg px-3 py-2 text-center text-sm"
+        >
+          🔄 Renew
+        </Link>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card label="DOB" value={member.date_of_birth ?? "—"} />
         <Card label="Gender" value={member.gender ?? "—"} />
         <Card label="Emergency name" value={member.emergency_contact_name ?? "—"} />
         <Card label="Emergency phone" value={member.emergency_contact_phone ?? "—"} />
       </div>
 
+      {info ? <div className="status-success mt-4 rounded-lg px-3 py-2 text-sm">{info}</div> : null}
+
       <div className="mt-4 grid grid-cols-1 gap-4">
         <Card label="Address" value={member.address ?? "—"} />
         <Card label="Notes" value={member.notes ?? "—"} />
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
+        <div className="mb-2 text-sm font-semibold text-[#1A1A2E]">Recent payments</div>
+        {recentPayments.length ? (
+          <div className="space-y-2">
+            {recentPayments.map((p) => (
+              <div key={p.id} className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs">
+                <div>{p.receipt_number}</div>
+                <div>{formatAmountINR(p.amount)}</div>
+                <div>{formatDateShortIST(p.payment_date)}</div>
+                <div className="uppercase">{p.payment_mode}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">No payment history found.</div>
+        )}
       </div>
 
       <ConfirmDialog
@@ -173,6 +279,31 @@ export default function MemberProfilePage({
           if (!deactivating) void deactivate();
         }}
       />
+    </div>
+  );
+}
+
+function MembershipBanner({ membership }: { membership: MembershipSummary | null }) {
+  if (!membership || membership.status === "none") {
+    return <div className="status-neutral rounded-xl px-4 py-3 text-sm">No membership assigned yet</div>;
+  }
+  if (membership.status === "expired") {
+    return (
+      <div className="status-danger rounded-xl px-4 py-3 text-sm">
+        Expired on {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} - Please renew
+      </div>
+    );
+  }
+  if (membership.status === "expiring") {
+    return (
+      <div className="status-warning rounded-xl px-4 py-3 text-sm">
+        ⚠ Expires in {membership.days_left} days - {membership.end_date ? formatDateShortIST(membership.end_date) : "-"}
+      </div>
+    );
+  }
+  return (
+    <div className="status-success rounded-xl px-4 py-3 text-sm">
+      Active until {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} ({membership.days_left} days left)
     </div>
   );
 }

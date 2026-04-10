@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase";
 
 type Props = {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ function itemClass(isActive: boolean, collapsed: boolean) {
 
 export function DashboardSidebar({ children }: Props) {
   const pathname = usePathname();
+  const supabase = createSupabaseBrowserClient();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -40,7 +42,7 @@ export function DashboardSidebar({ children }: Props) {
   }, [mobileOpen]);
 
   return (
-    <div className="flex min-h-screen bg-zinc-50">
+    <div className="flex min-h-screen bg-[#F4F6F8]">
       <aside
         className={[
           "hidden border-r border-zinc-200 bg-white transition-all duration-200 md:flex md:flex-col",
@@ -48,7 +50,7 @@ export function DashboardSidebar({ children }: Props) {
         ].join(" ")}
       >
         <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-3">
-          {!collapsed ? <span className="text-sm font-semibold text-zinc-900">SM FITNESS</span> : null}
+          {!collapsed ? <span className="text-sm font-semibold text-[#1A1A2E]">SM FITNESS</span> : null}
           <button
             type="button"
             onClick={() => setCollapsed((v) => !v)}
@@ -76,6 +78,18 @@ export function DashboardSidebar({ children }: Props) {
             );
           })}
         </nav>
+        <div className="border-t border-zinc-200 p-3">
+          <button
+            type="button"
+            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = "/login";
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -91,7 +105,7 @@ export function DashboardSidebar({ children }: Props) {
           <span className="ml-3 text-sm font-semibold text-zinc-900">SM FITNESS</span>
         </div>
 
-        <main className="flex-1 overflow-x-hidden">{children}</main>
+        <main className="flex-1 overflow-x-hidden pb-16 md:pb-0">{children}</main>
       </div>
 
       {mobileOpen ? (
@@ -131,10 +145,44 @@ export function DashboardSidebar({ children }: Props) {
                   </Link>
                 );
               })}
+              <button
+                type="button"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.href = "/login";
+                }}
+              >
+                Logout
+              </button>
             </nav>
           </aside>
         </div>
       ) : null}
+
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-200 bg-white md:hidden">
+        <div className="grid grid-cols-4">
+          {NAV_ITEMS.map((item, idx) => {
+            const isActive =
+              pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const icon = idx === 0 ? "🏠" : idx === 1 ? "👥" : idx === 2 ? "💳" : "📊";
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  "flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-[11px]",
+                  isActive ? "text-[#1A1A2E] font-semibold" : "text-slate-500",
+                ].join(" ")}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <span>{icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

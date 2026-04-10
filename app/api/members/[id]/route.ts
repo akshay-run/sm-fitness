@@ -40,7 +40,77 @@ export async function GET(
     photoSignedUrl = signed?.signedUrl ?? null;
   }
 
-  return NextResponse.json({ member: data, photoSignedUrl });
+  const todayIST = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  const { data: latestMembership } = await supabaseAdmin
+    .from("memberships")
+    .select("id, plan_id, fee_charged, start_date, end_date, status")
+    .eq("member_id", parsedParams.data.id)
+    .neq("status", "cancelled")
+    .order("end_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: plan } = latestMembership?.plan_id
+    ? await supabaseAdmin
+        .from("plans")
+        .select("name")
+        .eq("id", latestMembership.plan_id)
+        .single()
+    : { data: null };
+
+  let membershipStatus: "active" | "expiring" | "expired" | "none" = "none";
+  let daysLeft = 0;
+  if (latestMembership?.end_date) {
+    const end = String(latestMembership.end_date);
+    if (end < todayIST) {
+      membershipStatus = "expired";
+      daysLeft = 0;
+    } else {
+      const diffDays = Math.ceil(
+        (new Date(`${end}T00:00:00+05:30`).getTime() -
+          new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      daysLeft = diffDays;
+      membershipStatus = diffDays <= 7 ? "expiring" : "active";
+    }
+  }
+
+  const { data: recentPayments } = await supabaseAdmin
+    .from("payments")
+    .select("id, receipt_number, amount, payment_date, payment_mode")
+    .eq("member_id", parsedParams.data.id)
+    .order("payment_date", { ascending: false })
+    .limit(3);
+
+  return NextResponse.json({
+    member: data,
+    photoSignedUrl,
+    membershipSummary: latestMembership
+      ? {
+          plan_name: plan?.name ?? "Membership",
+          fee_charged: Number(latestMembership.fee_charged ?? 0),
+          start_date: latestMembership.start_date,
+          end_date: latestMembership.end_date,
+          status: membershipStatus,
+          days_left: daysLeft,
+        }
+      : {
+          plan_name: null,
+          fee_charged: null,
+          start_date: null,
+          end_date: null,
+          status: "none",
+          days_left: 0,
+        },
+    recentPayments: recentPayments ?? [],
+  });
 }
 
 export async function PATCH(

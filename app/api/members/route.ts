@@ -56,8 +56,90 @@ export async function GET(req: Request) {
   const { data, error: dbError, count } = await query.range(from, to);
   if (dbError) return internalServerError("Failed to load members");
 
+  const today = new Date();
+  const todayIST = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(today);
+
+  const items = (data ?? []) as Array<{
+    id: string;
+    member_code: string;
+    full_name: string;
+    mobile: string;
+    email: string | null;
+    photo_url: string | null;
+    is_active: boolean;
+    created_at: string;
+  }>;
+
+  const memberIds = items.map((m) => m.id);
+  const { data: memberships } = memberIds.length
+    ? await supabaseAdmin
+        .from("memberships")
+        .select("member_id, plan_id, end_date, status")
+        .in("member_id", memberIds)
+        .neq("status", "cancelled")
+        .order("end_date", { ascending: false })
+    : { data: [] as Array<{ member_id: string; plan_id: string; end_date: string; status: string }> };
+
+  const planIds = Array.from(new Set((memberships ?? []).map((m) => String(m.plan_id))));
+  const { data: plans } = planIds.length
+    ? await supabaseAdmin.from("plans").select("id, name").in("id", planIds)
+    : { data: [] as Array<{ id: string; name: string }> };
+  const planMap = new Map((plans ?? []).map((p) => [String(p.id), p.name]));
+
+  const latestMembershipMap = new Map<string, { plan_id: string; end_date: string }>();
+  for (const m of memberships ?? []) {
+    if (!latestMembershipMap.has(String(m.member_id))) {
+      latestMembershipMap.set(String(m.member_id), {
+        plan_id: String(m.plan_id),
+        end_date: String(m.end_date),
+      });
+    }
+  }
+
   return NextResponse.json({
-    items: data ?? [],
+    items: await Promise.all(
+      items.map(async (m) => {
+        const latest = latestMembershipMap.get(m.id);
+        const end = latest?.end_date ?? null;
+        let status: "active" | "expiring" | "expired" | "none" = "none";
+        let daysLeft: number | null = null;
+        if (end) {
+          if (end < todayIST) {
+            status = "expired";
+            daysLeft = 0;
+          } else {
+            const diffDays = Math.ceil(
+              (new Date(`${end}T00:00:00+05:30`).getTime() -
+                new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
+                (1000 * 60 * 60 * 24)
+            );
+            daysLeft = diffDays;
+            status = diffDays <= 7 ? "expiring" : "active";
+          }
+        }
+        let photo_signed_url: string | null = null;
+        if (m.photo_url) {
+          const bucket = process.env.SUPABASE_MEMBER_PHOTO_BUCKET || "sm-fitness-member-photo";
+          const { data: signed } = await supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUrl(String(m.photo_url), 60 * 60);
+          photo_signed_url = signed?.signedUrl ?? null;
+        }
+        return {
+          ...m,
+          photo_signed_url,
+          membership_plan_name: latest ? planMap.get(latest.plan_id) ?? "Membership" : null,
+          membership_end_date: end,
+          membership_status: status,
+          membership_days_left: daysLeft,
+        };
+      })
+    ),
     page,
     pageSize,
     total: count ?? 0,
@@ -132,13 +214,15 @@ export async function POST(req: Request) {
         gymName,
         memberName: data.full_name,
         memberCode: data.member_code,
+        mobile: parsed.data.mobile,
       });
+      const firstName = data.full_name.split(" ")[0] || data.full_name;
       await sendAndLog({
         supabaseAdmin,
         member_id: data.id,
         type: "welcome",
         to: data.email,
-        subject: `Welcome to ${gymName}`,
+        subject: `Welcome to ${gymName}, ${firstName}! 🎉`,
         html,
       });
     }

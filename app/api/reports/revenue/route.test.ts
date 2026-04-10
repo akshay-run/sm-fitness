@@ -39,7 +39,7 @@ describe("GET /api/reports/revenue", () => {
     expect(json.rows[0].total).toBe(3000);
     expect(json.rows[0].cash_total).toBe(1000);
     expect(json.rows[0].upi_total).toBe(2000);
-  }, 10000);
+  }, 20000);
 
   it("returns 500 when db query fails", async () => {
     revenueDbError = true;

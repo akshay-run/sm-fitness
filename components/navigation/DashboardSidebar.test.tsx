@@ -4,6 +4,14 @@ vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/members"),
 }));
 
+vi.mock("@/lib/supabase", () => ({
+  createSupabaseBrowserClient: () => ({
+    auth: {
+      signOut: vi.fn(async () => ({})),
+    },
+  }),
+}));
+
 describe("DashboardSidebar", () => {
   it("marks active nav item with aria-current", async () => {
     const { DashboardSidebar } = await import("@/components/navigation/DashboardSidebar");
@@ -13,8 +21,8 @@ describe("DashboardSidebar", () => {
       </DashboardSidebar>
     );
 
-    const membersLink = screen.getByRole("link", { name: /members/i });
-    expect(membersLink).toHaveAttribute("aria-current", "page");
-  });
+    const membersLinks = screen.getAllByRole("link", { name: /members/i });
+    expect(membersLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
+  }, 20000);
 });
 

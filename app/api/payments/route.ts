@@ -7,6 +7,7 @@ import { getNextReceiptNumber } from "@/lib/receiptNumber";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
 import { internalServerError } from "@/lib/apiError";
+import { formatDateShortIST } from "@/lib/uiFormat";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -138,15 +139,17 @@ export async function POST(req: Request) {
         .single();
 
       const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
+      const amountLabel = Number(membership.fee_charged ?? 0).toLocaleString("en-IN");
       const html = renderReceiptEmail({
         gymName,
         memberName: member.full_name,
         receiptNumber: receipt_number,
-        amount: String(Number(membership.fee_charged).toFixed(2)),
+        amount: amountLabel,
         paymentMode: parsed.data.payment_mode,
         planName: plan?.name ?? "Membership",
-        startDate: String(membership.start_date),
-        endDate: String(membership.end_date),
+        startDate: formatDateShortIST(String(membership.start_date)),
+        endDate: formatDateShortIST(String(membership.end_date)),
+        upiRef: parsed.data.upi_ref ? parsed.data.upi_ref : null,
       });
 
       const sent = await sendAndLog({
@@ -154,7 +157,7 @@ export async function POST(req: Request) {
         member_id: member.id,
         type: "receipt",
         to: member.email,
-        subject: `Receipt ${receipt_number} — ${gymName}`,
+        subject: `Payment Receipt ${receipt_number} — ${gymName}`,
         html,
         membership_id: membership.id,
       });

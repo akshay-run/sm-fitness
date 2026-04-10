@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { sendAndLog } from "@/lib/email";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
+import { formatDateShortIST } from "@/lib/uiFormat";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -56,11 +57,11 @@ export async function POST(
     gymName,
     memberName: member.full_name,
     receiptNumber: payment.receipt_number,
-    amount: String(Number(payment.amount).toFixed(2)),
+    amount: Number(payment.amount ?? 0).toLocaleString("en-IN"),
     paymentMode: payment.payment_mode,
     planName: plan?.name ?? "Membership",
-    startDate: String(membership?.start_date ?? ""),
-    endDate: String(membership?.end_date ?? ""),
+    startDate: membership?.start_date ? formatDateShortIST(String(membership.start_date)) : "",
+    endDate: membership?.end_date ? formatDateShortIST(String(membership.end_date)) : "",
   });
 
   const sent = await sendAndLog({
@@ -68,7 +69,7 @@ export async function POST(
     member_id: member.id,
     type: "receipt",
     to: member.email,
-    subject: `Receipt ${payment.receipt_number} — ${gymName}`,
+    subject: `Payment Receipt ${payment.receipt_number} — ${gymName}`,
     html,
     membership_id: payment.membership_id,
   });

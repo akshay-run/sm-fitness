@@ -7,6 +7,7 @@ export function renderReceiptEmail({
   planName,
   startDate,
   endDate,
+  upiRef,
 }: {
   gymName: string;
   memberName: string;
@@ -16,17 +17,18 @@ export function renderReceiptEmail({
   planName: string;
   startDate: string;
   endDate: string;
+  upiRef?: string | null;
 }) {
   const safeGym = escapeHtml(gymName);
   const safeName = escapeHtml(memberName);
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;background:#f4f4f5;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">
+  <body style="margin:0;background:#f4f6f8;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">
     <div style="max-width:560px;margin:0 auto;padding:24px;">
-      <div style="background:#fff;border:1px solid #e4e4e7;border-radius:16px;padding:20px;">
-        <h1 style="margin:0 0 8px 0;font-size:18px;color:#18181b;">Payment receipt — ${safeGym}</h1>
-        <p style="margin:0 0 16px 0;font-size:14px;color:#3f3f46;">Hi ${safeName}, thanks for your payment.</p>
+      <div style="background:#fff;border:1px solid #e4e4e7;border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(15,23,42,.08)">
+        <h1 style="margin:0 0 8px 0;font-size:18px;color:#1a1a2e;">Payment Receipt — ${safeGym}</h1>
+        <p style="margin:0 0 16px 0;font-size:14px;color:#334155;">Hi ${safeName}, thank you for your payment!</p>
 
         <div style="display:block;border:1px solid #e4e4e7;border-radius:12px;overflow:hidden;">
           <div style="padding:12px 14px;background:#fafafa;border-bottom:1px solid #e4e4e7;">
@@ -37,13 +39,15 @@ export function renderReceiptEmail({
           </div>
           <div style="padding:14px;">
             ${row("Plan", planName)}
-            ${row("Dates", `${startDate} → ${endDate}`)}
-            ${row("Amount", `₹${amount}`)}
+            ${row("Membership valid", `${startDate} → ${endDate}`)}
+            ${row("Amount paid", `₹${amount}`)}
             ${row("Payment mode", paymentMode.toUpperCase())}
+            ${upiRef ? row("UPI Ref", upiRef) : ""}
           </div>
         </div>
 
-        <p style="margin:12px 0 0 0;font-size:12px;color:#71717a;">This is an automated email (no PDF).</p>
+        <p style="margin:12px 0 0 0;font-size:14px;color:#334155;">Your membership is now active. See you at the gym! 💪</p>
+        <p style="margin:10px 0 0 0;font-size:12px;color:#64748b;">SM FITNESS | This receipt is system-generated.</p>
       </div>
     </div>
   </body>

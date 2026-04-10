@@ -17,7 +17,41 @@ vi.mock("@/components/email/WelcomeEmail", () => ({
 
 function makeMembersSupabaseMock() {
   return {
+    storage: {
+      from: () => ({
+        createSignedUrl: async () => ({ data: { signedUrl: "https://example.com/photo.jpg" } }),
+      }),
+    },
     from: (table: string) => {
+      if (table === "memberships") {
+        return {
+          select: () => ({
+            in: () => ({
+              neq: () => ({
+                order: async () => ({
+                  data: [
+                    {
+                      member_id: "member-1",
+                      plan_id: "plan-1",
+                      end_date: "2099-01-01",
+                      status: "active",
+                    },
+                  ],
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "plans") {
+        return {
+          select: () => ({
+            in: async () => ({
+              data: [{ id: "plan-1", name: "Monthly" }],
+            }),
+          }),
+        };
+      }
       if (table !== "members") throw new Error(`Unexpected table ${table}`);
       return {
         select: () => ({
