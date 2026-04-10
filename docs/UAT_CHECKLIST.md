@@ -6,7 +6,7 @@ Use this checklist before production release.
 
 - [ ] `.env` values configured in deployment platform.
 - [ ] Supabase tables, RPC functions, constraints, RLS policies applied.
-- [ ] Storage bucket `member-photos` exists and is private.
+- [ ] Storage bucket exists and is private (default name `sm-fitness-member-photo`, or matches `SUPABASE_MEMBER_PHOTO_BUCKET`).
 - [ ] `plans` table is seeded with required plans.
 - [ ] Cron schedules configured and deployed.
 

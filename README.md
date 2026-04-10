@@ -1,51 +1,69 @@
 # SM FITNESS
 
-Admin-only Gym Management System (PWA) built with Next.js, Supabase, and Tailwind CSS.
+Admin-only gym management PWA: members, memberships, payments (cash + UPI QR), email (Nodemailer), dashboard, and reports. Built with Next.js (App Router), Supabase, and Tailwind CSS.
 
-## Overview
+## Documentation index
 
-SM FITNESS is designed for a single gym owner/admin to manage:
-- Members (create, edit, soft deactivate)
-- Membership lifecycle (plans, renewals, date logic in IST)
-- Payments (cash + UPI QR, manual confirmation, one payment per membership)
-- Email notifications (welcome, receipt, reminders, resend)
-- Dashboard analytics and reports (CSV export, revenue summary)
+| Resource | Description |
+|----------|-------------|
+| [docs/README.md](docs/README.md) | Index of all project docs. |
+| [docs/ENV_SETUP_STEPS.md](docs/ENV_SETUP_STEPS.md) | **Start here for `.env`:** step-by-step from install to Vercel. |
+| [docs/ENV_CONFIGURATION.md](docs/ENV_CONFIGURATION.md) | Full `.env` variable reference, security, troubleshooting. |
+| [docs/ENV_SETUP_CHECKLIST.md](docs/ENV_SETUP_CHECKLIST.md) | Quick env checklist before first run. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Codebase layout, auth, API map, data rules. |
+| [docs/UAT_CHECKLIST.md](docs/UAT_CHECKLIST.md) | Pre-release acceptance testing. |
+| [docs/E2E_TEST_MATRIX.md](docs/E2E_TEST_MATRIX.md) | Test cases, slow-network checks, automated gate log. |
+| [.env.example](.env.example) | Safe template (copy to `.env.local`; do not commit secrets). |
 
-## Tech Stack
+## Features
 
-- Next.js (App Router, TypeScript)
-- Tailwind CSS
-- Supabase (PostgreSQL, Auth, Storage)
-- Nodemailer (Gmail SMTP)
-- Zod
-- date-fns + date-fns-tz
-- qrcode
-- Vercel (deployment + cron)
-- Vitest + Testing Library (unit/integration tests)
+- **Members:** Create, edit, soft deactivate; auto member code; photo upload or webcam (compressed).
+- **Memberships:** Plans (monthly/quarterly/half-yearly/annual), custom fee, IST dates, renewal rules.
+- **Payments:** Cash or UPI (QR + manual confirm), one payment per membership, receipt numbering, HTML email receipt.
+- **Email:** Welcome, receipt, expiry reminders (cron); duplicate prevention and logs; resend.
+- **Dashboard:** Stats, revenue (this month vs last), upcoming renewals, recent payments.
+- **Reports:** CSV export, monthly revenue summary.
+- **Access:** Supabase Auth with an explicit `admins` table check (no privilege escalation via login alone).
+- **Cron:** Reminders and keep-alive ping; authenticate with `x-cron-secret` header only.
+- **PWA:** Manifest and install-friendly baseline.
 
-## Current Implementation Status
+## Tech stack
 
-Steps 1-12 are implemented in code:
-- Project setup and auth
-- Member CRUD + photo capture/upload/compression
-- Membership flow + renewal logic
-- Payment flow + receipt numbering
-- Email triggers + resend + logging
-- Cron reminders + keep-alive ping
-- Dashboard + reports + print receipt
-- PWA manifest, install prompt, and baseline service worker
+- Next.js (App Router, TypeScript), Tailwind CSS  
+- Supabase (PostgreSQL, Auth, Storage)  
+- Nodemailer (Gmail SMTP), Zod, date-fns + date-fns-tz, qrcode  
+- Vercel (hosting + cron)  
+- Vitest + Testing Library (unit/integration tests)  
+- GitHub Actions CI: `npm ci`, `test`, `lint`, `build` (see [.github/workflows/ci.yml](.github/workflows/ci.yml))
 
-## Local Setup
+## Project structure (overview)
 
-### 1) Install dependencies
+```text
+app/
+  (auth)/login/       # Sign-in
+  (dashboard)/       # Admin UI: home, members, memberships, payments, reports
+  api/               # JSON API routes (members, payments, cron, email, reports, …)
+components/          # UI, forms, navigation, email templates
+lib/                 # Supabase clients, auth, mailer, validations, date/IST helpers
+middleware.ts        # Auth/session handling for protected routes
+docs/                # Guides: env, UAT, architecture, E2E matrix
+```
+
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Local setup
+
+### 1. Install
 
 ```bash
 npm install
 ```
 
-### 2) Configure environment
+### 2. Environment
 
-Create `.env.local` with:
+Follow **[docs/ENV_SETUP_STEPS.md](docs/ENV_SETUP_STEPS.md)** for a full sequence, or **[docs/ENV_CONFIGURATION.md](docs/ENV_CONFIGURATION.md)** for the variable reference only.
+
+Minimal template:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
@@ -59,68 +77,47 @@ NEXT_PUBLIC_UPI_ID=
 NEXT_PUBLIC_GYM_NAME=SM FITNESS
 
 CRON_SECRET=
+SUPABASE_MEMBER_PHOTO_BUCKET=sm-fitness-member-photo
 ```
 
-### 3) Run locally
+Copy from [.env.example](.env.example) to **`.env.local`** at the repo root (never commit). On Windows (PowerShell): `Copy-Item .env.example .env.local`.
+
+### 3. Run
 
 ```bash
 npm run dev
 ```
 
-App runs at `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## Supabase Prerequisites
+## Supabase prerequisites
 
-Before running end-to-end flows, ensure:
-- All tables from project context exist (`members`, `memberships`, `payments`, `plans`, `email_logs`, `admins`, counters).
-- RLS is enabled and policies are correctly configured.
-- Only users explicitly present in `admins` are allowed to use the app (no auto-owner bootstrap on login).
-- `plans` is seeded (`Monthly`, `Quarterly`, `Half-Yearly`, `Annual`).
-- Storage bucket `member-photos` exists and is private.
+Before full flows work:
 
-### Required SQL RPC Functions
+- Tables: `members`, `memberships`, `payments`, `plans`, `email_logs`, `admins`, counter tables as per your schema.
+- **Admin access:** Insert your auth user’s UUID into `admins` (the app denies dashboard/API access otherwise).
+- Seed `plans` (e.g. Monthly, Quarterly, Half-Yearly, Annual).
+- **Storage:** Private bucket whose name matches `SUPABASE_MEMBER_PHOTO_BUCKET` (default `sm-fitness-member-photo`).
+- RLS policies appropriate for your security model.
+- RPC: `next_member_code()`, `next_receipt_number()` with seeded counter rows.
 
-1. `next_member_code()`  
-   Generates atomic member codes (e.g. `GYM-001`).
+### DB safeguards (production)
 
-2. `next_receipt_number()`  
-   Generates atomic yearly-reset receipt numbers (e.g. `RCP-2026-0001`).
+- Unique constraint: one payment per membership, e.g.  
+  `alter table payments add constraint payments_membership_id_unique unique (membership_id);`
+- Seed counter rows for member and receipt sequences as required by your RPCs.
 
-## DB Safeguards (Required for Production)
+## Cron
 
-- Add DB-level unique guarantee for one payment per membership:
+Configured in `vercel.json` (reminders, ping). Call with header:
 
-```sql
-alter table payments
-add constraint payments_membership_id_unique unique (membership_id);
+```http
+x-cron-secret: <CRON_SECRET>
 ```
 
-- Ensure counter tables have initial rows:
-  - `member_code_counter(id=1)`
-  - `receipt_counter(id=1)`
+Query-string secrets are not supported (avoid leakage in logs and URLs).
 
-- Apply migrations in safe order:
-  1) Tables
-  2) Seed `plans`
-  3) Counter seed rows
-  4) RPC functions
-  5) Constraints/indexes
-  6) RLS policies
-
-## Cron Endpoints
-
-Configured in `vercel.json`:
-- `/api/cron/reminders` -> daily reminders at 8:00 AM IST
-- `/api/cron/ping` -> keep-alive ping every 3 days
-
-Both require `CRON_SECRET` via:
-- header: `x-cron-secret`
-
-Query-string secret is intentionally not supported to avoid secret leakage in logs/URLs.
-
-## Testing
-
-Commands:
+## Testing and quality
 
 ```bash
 npm run test
@@ -130,37 +127,21 @@ npm run lint
 npm run build
 ```
 
-Current automated baseline includes unit/integration tests for:
-- Date helpers
-- Zod schemas
-- RPC wrappers
-- Core API routes (`members`, `memberships`, `payments`, `cron/reminders`, `reports/members-csv`)
-- Email duplicate-check helper
+Tests cover date helpers, Zod schemas, RPC helpers, core API routes, email helpers, cron verification, UI components (e.g. sidebar), and more. Full browser E2E is manual; see [docs/E2E_TEST_MATRIX.md](docs/E2E_TEST_MATRIX.md).
 
 ## Deployment (Vercel)
 
-1. Set all required env vars in Vercel Project Settings.
-2. Confirm Supabase project and DB objects are production-ready.
-3. Deploy.
-4. Validate:
-   - Auth flow
-   - Member/membership/payment flows
-   - Email send + resend
-   - Cron endpoints using secret
-   - Reports export
+1. Set all environment variables in Vercel (same names as local).  
+2. Confirm Supabase production project: schema, RLS, bucket, `admins`, RPCs.  
+3. Deploy and run through [docs/UAT_CHECKLIST.md](docs/UAT_CHECKLIST.md).
 
-## UAT and Release Checklist
+## Known limitations
 
-See: [`docs/UAT_CHECKLIST.md`](docs/UAT_CHECKLIST.md)
+- Next.js may warn that the `middleware` convention is deprecated in favor of `proxy`; migration can be scheduled separately.  
+- UPI is manual confirmation (no payment gateway).  
+- Automated tests use mocks; live Supabase flows rely on UAT/manual checks.
 
-## Known Limitations
+## Future improvements
 
-- Middleware deprecation warning from Next.js (`middleware` to `proxy`) remains non-blocking but should be migrated in a future update.
-- UPI confirmation is manual by design (no gateway/webhook).
-- Full E2E browser automation is not yet added (unit/integration baseline is present).
-
-## Future Improvements
-
-- Add Playwright E2E suite for full user flows.
-- Add CI coverage gate.
-- Add structured migration files for Supabase schema lifecycle.
+- Optional Playwright (or similar) for smoke E2E in CI.  
+- Structured Supabase migrations in-repo for repeatable schema rollout.

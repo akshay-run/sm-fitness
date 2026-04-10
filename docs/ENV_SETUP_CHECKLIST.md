@@ -1,96 +1,43 @@
-# SM FITNESS Env Setup Checklist
+# SM FITNESS — Environment setup checklist
 
-Use this file to collect all required setup values before running the app.
+Use this as a quick pre-flight list. For a **numbered walkthrough** (install → keys → Gmail → Vercel), see **[ENV_SETUP_STEPS.md](./ENV_SETUP_STEPS.md)**. For detailed explanations, security notes, and troubleshooting, see **[ENV_CONFIGURATION.md](./ENV_CONFIGURATION.md)**.
 
-## 1) `.env.local` values to fill
+## Quick steps
 
-Create `d:\sm-fitness\cursor\.env.local` and add:
+1. Copy the template: `cp .env.example .env.local` (from repo root).
+2. Fill every variable in the table below.
+3. In Supabase: tables, RLS, RPCs, `admins` row for your user, storage bucket (default name: `sm-fitness-member-photo`).
+4. Run `npm install` then `npm run dev` and complete [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) for your environment.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+## Variables to fill
 
-GMAIL_USER=
-GMAIL_APP_PASSWORD=
+| Variable | Filled |
+|----------|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | [ ] |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | [ ] |
+| `SUPABASE_SERVICE_ROLE_KEY` | [ ] |
+| `GMAIL_USER` | [ ] |
+| `GMAIL_APP_PASSWORD` | [ ] |
+| `NEXT_PUBLIC_UPI_ID` | [ ] |
+| `NEXT_PUBLIC_GYM_NAME` | [ ] |
+| `CRON_SECRET` | [ ] |
+| `SUPABASE_MEMBER_PHOTO_BUCKET` (optional; default `sm-fitness-member-photo`) | [ ] |
 
-NEXT_PUBLIC_UPI_ID=
-NEXT_PUBLIC_GYM_NAME=SM FITNESS
+## Where to get values (summary)
 
-CRON_SECRET=
-```
+- **Supabase:** Dashboard → Project Settings → API (URL, anon key, service role key).
+- **Gmail:** App Password after enabling 2-Step Verification.
+- **UPI / gym name:** Your VPA and display name.
+- **Cron:** Generate a long random string; use as `CRON_SECRET` locally and in Vercel.
 
-## 2) Where to get each value
+## Fill-and-share (optional)
 
-### Supabase
-
-1. Open Supabase Dashboard -> your project.
-2. Go to **Project Settings -> API**.
-3. Copy:
-   - `NEXT_PUBLIC_SUPABASE_URL` = Project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = anon public key
-   - `SUPABASE_SERVICE_ROLE_KEY` = service_role key (keep private)
-
-### Gmail SMTP (Nodemailer)
-
-1. Use the Gmail account that should send emails.
-2. Enable 2-Step Verification.
-3. Generate an **App Password**.
-4. Set:
-   - `GMAIL_USER` = Gmail address (example: owner@gmail.com)
-   - `GMAIL_APP_PASSWORD` = generated 16-char app password
-
-### UPI
-
-- `NEXT_PUBLIC_UPI_ID` = your UPI handle (example: `9876543210@upi`)
-- `NEXT_PUBLIC_GYM_NAME` = keep `SM FITNESS` unless you want another label
-
-### Cron Secret
-
-- `CRON_SECRET` = long random string (32+ chars recommended)
-- Example PowerShell:
-
-```powershell
-[guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
-```
-
-## 3) Non-env prerequisites (must also be done)
-
-In Supabase, ensure:
-
-- Tables exist: `members`, `memberships`, `payments`, `plans`, `email_logs`, `admins`, counters.
-- Add your authenticated admin user to `admins` table before first login (required access control).
-- `plans` is seeded (`Monthly`, `Quarterly`, `Half-Yearly`, `Annual`).
-- Storage bucket exists: `member-photos` (private).
-- RLS policies configured.
-- SQL RPC functions exist:
-  - `next_member_code()`
-  - `next_receipt_number()`
-
-Recommended DB safeguard:
-
-```sql
-alter table payments
-add constraint payments_membership_id_unique unique (membership_id);
-```
-
-Cron security rule:
-- Trigger cron endpoints with `x-cron-secret` request header only.
-
-## 4) Fill-and-share section
-
-Paste your values here (or share in chat) when ready:
+For support or handoff, you can paste non-secret placeholders here (never commit real secrets):
 
 ```txt
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-GMAIL_USER=
-GMAIL_APP_PASSWORD=
-NEXT_PUBLIC_UPI_ID=
-NEXT_PUBLIC_GYM_NAME=SM FITNESS
-CRON_SECRET=
+NEXT_PUBLIC_SUPABASE_URL=(set)
+SUPABASE_SERVICE_ROLE_KEY=(set, private)
+... etc.
 ```
 
-After you provide these, we can validate environment setup and run live feature checks.
-
+After values are configured, run: `npm run test`, `npm run lint`, `npm run build`.
