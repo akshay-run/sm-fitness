@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { getGymDisplay } from "@/lib/gymDisplay";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -46,11 +47,14 @@ export async function GET(
     .eq("id", membership?.plan_id ?? "")
     .single();
 
+  const gym = await getGymDisplay(supabaseAdmin);
+
   return NextResponse.json({
     payment: data,
     member: member ?? null,
     membership: membership ?? null,
     plan: plan ?? null,
+    gym,
   });
 }
 

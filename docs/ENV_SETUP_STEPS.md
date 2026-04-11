@@ -84,31 +84,43 @@ Set:
 
 ---
 
-## Step 7 — Member photo bucket (optional name override)
+## Step 7 — Storage buckets (member photos + gym assets)
 
-- Default bucket name in code: `sm-fitness-member-photo`.
-- If your Supabase Storage bucket uses another name, set:
+Create **two private** buckets in Supabase → **Storage** (unless you already created them):
 
-  `SUPABASE_MEMBER_PHOTO_BUCKET=<your-bucket-name>`
+| Bucket | Default env variable | Used for |
+|--------|----------------------|----------|
+| `sm-fitness-member-photo` | `SUPABASE_MEMBER_PHOTO_BUCKET` | Member profile photos |
+| `gym-assets` | `SUPABASE_GYM_ASSETS_BUCKET` | Logo and UPI QR image (Settings page) |
 
-- Create the bucket in Supabase (private) and align policies with your security model. See [README.md](../README.md#supabase-prerequisites).
+If you use different names, set the matching variables in `.env.local` (and Vercel). The API uploads via the **service role**; bucket names must match the env vars.
 
 ---
 
-## Step 8 — Database and access (not env vars, but required)
+## Step 8 — Database migration for Settings and members (required)
+
+After your core schema exists, run the extension migration in the Supabase **SQL Editor**:
+
+- File in repo: [`supabase/migrations/001_sm_fitness_extensions.sql`](../supabase/migrations/001_sm_fitness_extensions.sql)
+
+It adds `gym_settings`, `plans.default_price`, `members.blood_group` / `joining_date`, and removes legacy emergency-contact columns if present. See [`supabase/README.md`](../supabase/README.md) for the full apply order.
+
+---
+
+## Step 9 — Database and access (not env vars, but required)
 
 Without these, login or features will fail even with a correct `.env.local`:
 
-1. Tables, RLS, RPCs (`next_member_code`, `next_receipt_number`), counters — per your schema.
-2. **`admins` row:** insert your Supabase Auth user UUID so the app allows dashboard access.
+1. Tables, RLS, RPCs (`next_member_code`, `next_receipt_number`), counters — per your schema **plus** Step 8.
+2. **`admins` row:** insert your Supabase Auth user UUID so the app allows dashboard access. Template: [`supabase/seed_admin_example.sql`](../supabase/seed_admin_example.sql).
 3. Seed `plans` (e.g. Monthly, Quarterly, Half-Yearly, Annual).
-4. Storage bucket exists and matches Step 7.
+4. Storage buckets from Step 7 exist and names match your env vars.
 
 Use [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) for a full pre-flight list.
 
 ---
 
-## Step 9 — Verify locally
+## Step 10 — Verify locally
 
 ```bash
 npm run dev
@@ -124,7 +136,7 @@ npm run build
 
 ---
 
-## Step 10 — Production (Vercel)
+## Step 11 — Production (Vercel)
 
 1. In Vercel → Project → **Settings** → **Environment Variables**, add **the same variable names** as in `.env.local` for Production (and Preview if needed).
 2. Redeploy after changing variables.

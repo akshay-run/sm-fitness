@@ -1,12 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { PhotoCapture } from "@/components/members/PhotoCapture";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
-import { reminderMessage, smsLink, whatsappLink } from "@/lib/messageTemplates";
+import {
+  membershipRenewalReminderMessage,
+  reminderMessage,
+  smsLink,
+  whatsappLink,
+} from "@/lib/messageTemplates";
+
+const PhotoCapture = dynamic(
+  () => import("@/components/members/PhotoCapture").then((m) => m.PhotoCapture),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-40 animate-pulse rounded-2xl border border-zinc-200 bg-zinc-100" />
+    ),
+  }
+);
 
 type Member = {
   id: string;
@@ -17,8 +32,8 @@ type Member = {
   date_of_birth: string | null;
   gender: string | null;
   address: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
+  blood_group: string | null;
+  joining_date: string | null;
   photo_url: string | null;
   notes: string | null;
   is_active: boolean;
@@ -33,6 +48,15 @@ type MembershipSummary = {
   start_date: string | null;
   status: "active" | "expiring" | "expired" | "none";
   days_left: number;
+};
+
+type MembershipHistoryRow = {
+  id: string;
+  plan_name: string;
+  fee_charged: number;
+  start_date: string;
+  end_date: string;
+  status: string;
 };
 
 type PaymentSummary = {
@@ -56,10 +80,29 @@ export default function MemberProfilePage({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [membership, setMembership] = useState<MembershipSummary | null>(null);
+  const [membershipHistory, setMembershipHistory] = useState<MembershipHistoryRow[]>([]);
+  const [ageYears, setAgeYears] = useState<number | null>(null);
   const [recentPayments, setRecentPayments] = useState<PaymentSummary[]>([]);
   const [info, setInfo] = useState<string | null>(null);
+  const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS");
 
   const idPromise = useMemo(() => params, [params]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await fetch("/api/settings", { cache: "no-store" });
+        const sj = await s.json();
+        if (s.ok && sj.gym_name && !cancelled) setGymName(String(sj.gym_name));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +120,8 @@ export default function MemberProfilePage({
           setPhotoSignedUrl(json.photoSignedUrl ?? null);
           setMembership(json.membershipSummary ?? null);
           setRecentPayments(json.recentPayments ?? []);
+          setMembershipHistory(json.membershipHistory ?? []);
+          setAgeYears(typeof json.ageYears === "number" ? json.ageYears : null);
         }
       }
       if (!cancelled) setLoading(false);
@@ -95,7 +140,6 @@ export default function MemberProfilePage({
       if (!res.ok) throw new Error(json?.error ?? "Failed to deactivate");
       setConfirmOpen(false);
       router.refresh();
-      // Reload member
       const r2 = await fetch(`/api/members/${member.id}`, { cache: "no-store" });
       const j2 = await r2.json();
       setMember(j2.member);
@@ -114,7 +158,7 @@ export default function MemberProfilePage({
     );
   }
 
-  if (error) {
+  if (error && !member) {
     return (
       <div className="mx-auto w-full max-w-4xl p-6">
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -125,11 +169,43 @@ export default function MemberProfilePage({
   }
 
   if (!member) return null;
-  const reminder = reminderMessage({
-    name: member.full_name,
-    endDate: membership?.end_date ? formatDateShortIST(membership.end_date) : "",
-    daysLeft: membership?.days_left ?? 0,
-  });
+
+  const endFormatted = membership?.end_date ? formatDateShortIST(membership.end_date) : "";
+  const reminder = (() => {
+    if (!endFormatted) {
+      return reminderMessage({
+        name: member.full_name,
+        endDate: "",
+        daysLeft: membership?.days_left ?? 0,
+      });
+    }
+    if (membership?.status === "expired" || (membership?.days_left ?? 0) <= 0) {
+      return reminderMessage({
+        name: member.full_name,
+        endDate: endFormatted,
+        daysLeft: 0,
+      });
+    }
+    return membershipRenewalReminderMessage({
+      memberName: member.full_name,
+      expiryDate: endFormatted,
+      gymName,
+    });
+  })();
+
+  const memberSince =
+    member.joining_date != null && String(member.joining_date).length >= 8
+      ? formatDateShortIST(String(member.joining_date))
+      : member.created_at
+        ? formatDateShortIST(member.created_at)
+        : "—";
+
+  const dobDisplay =
+    member.date_of_birth && ageYears != null
+      ? `${formatDateShortIST(member.date_of_birth)} (${ageYears} yrs)`
+      : member.date_of_birth
+        ? formatDateShortIST(member.date_of_birth)
+        : "—";
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
@@ -140,7 +216,7 @@ export default function MemberProfilePage({
           </h1>
           <p className="mt-1 text-sm text-zinc-600">{member.member_code}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href={`/members/${member.id}/edit`}
             className="rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50"
@@ -169,6 +245,12 @@ export default function MemberProfilePage({
         </div>
       </div>
 
+      {error ? (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
       <div className="mt-4">
         <MembershipBanner membership={membership} />
       </div>
@@ -177,8 +259,11 @@ export default function MemberProfilePage({
         <Card label="Mobile" value={member.mobile} />
         <Card label="Email" value={member.email ?? "—"} />
         <Card label="Plan" value={membership?.plan_name ?? "—"} />
-        <Card label="Fee paid" value={membership?.fee_charged ? formatAmountINR(membership.fee_charged) : "—"} />
-        <Card label="Member since" value={member.created_at ? formatDateShortIST(member.created_at) : "—"} />
+        <Card
+          label="Fee paid"
+          value={membership?.fee_charged ? formatAmountINR(membership.fee_charged) : "—"}
+        />
+        <Card label="Member since" value={memberSince} />
         <Card label="Member code" value={member.member_code} />
       </div>
 
@@ -191,7 +276,10 @@ export default function MemberProfilePage({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <a href={whatsappLink(member.mobile, reminder)} className="status-success rounded-lg px-3 py-2 text-center text-sm">
+        <a
+          href={whatsappLink(member.mobile, reminder)}
+          className="status-success rounded-lg px-3 py-2 text-center text-sm"
+        >
           📱 WhatsApp
         </a>
         <a href={smsLink(member.mobile, reminder)} className="status-info rounded-lg px-3 py-2 text-center text-sm">
@@ -209,8 +297,8 @@ export default function MemberProfilePage({
               member_id: member.id,
               type: "welcome",
               to: member.email,
-              subject: `Welcome to SM FITNESS, ${member.full_name.split(" ")[0]}! 🎉`,
-              html: `<p>Hi ${member.full_name},</p><p>Thanks for being part of SM FITNESS.</p>`,
+              subject: `Welcome to ${gymName}, ${member.full_name.split(" ")[0]}! 🎉`,
+              html: `<p>Hi ${member.full_name},</p><p>Thanks for being part of ${gymName}.</p>`,
               allow_duplicate: true,
             };
             const res = await fetch("/api/email", {
@@ -237,10 +325,9 @@ export default function MemberProfilePage({
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card label="DOB" value={member.date_of_birth ?? "—"} />
+        <Card label="DOB" value={dobDisplay} />
         <Card label="Gender" value={member.gender ?? "—"} />
-        <Card label="Emergency name" value={member.emergency_contact_name ?? "—"} />
-        <Card label="Emergency phone" value={member.emergency_contact_phone ?? "—"} />
+        <Card label="Blood group" value={member.blood_group ?? "—"} />
       </div>
 
       {info ? <div className="status-success mt-4 rounded-lg px-3 py-2 text-sm">{info}</div> : null}
@@ -250,12 +337,38 @@ export default function MemberProfilePage({
         <Card label="Notes" value={member.notes ?? "—"} />
       </div>
 
+      <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4">
+        <div className="mb-2 text-sm font-semibold text-[#1A1A2E]">Membership history</div>
+        {membershipHistory.length ? (
+          <div className="space-y-2">
+            {membershipHistory.map((h) => (
+              <div
+                key={h.id}
+                className="grid grid-cols-1 gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-xs sm:grid-cols-2"
+              >
+                <div className="font-medium text-zinc-900">{h.plan_name}</div>
+                <div className="text-zinc-600">
+                  {formatDateShortIST(h.start_date)} → {formatDateShortIST(h.end_date)}
+                </div>
+                <div>{formatAmountINR(h.fee_charged)}</div>
+                <div className="uppercase text-zinc-500">{h.status}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">No membership records.</div>
+        )}
+      </div>
+
       <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
         <div className="mb-2 text-sm font-semibold text-[#1A1A2E]">Recent payments</div>
         {recentPayments.length ? (
           <div className="space-y-2">
             {recentPayments.map((p) => (
-              <div key={p.id} className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs">
+              <div
+                key={p.id}
+                className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs"
+              >
                 <div>{p.receipt_number}</div>
                 <div>{formatAmountINR(p.amount)}</div>
                 <div>{formatDateShortIST(p.payment_date)}</div>
@@ -271,7 +384,7 @@ export default function MemberProfilePage({
       <ConfirmDialog
         open={confirmOpen}
         title="Deactivate member?"
-        description="This will set is_active=false. Data will not be deleted."
+        description="Are you sure you want to deactivate this member? They will be marked inactive; existing records are kept."
         confirmText={deactivating ? "Deactivating..." : "Deactivate"}
         danger
         onCancel={() => setConfirmOpen(false)}
@@ -285,7 +398,9 @@ export default function MemberProfilePage({
 
 function MembershipBanner({ membership }: { membership: MembershipSummary | null }) {
   if (!membership || membership.status === "none") {
-    return <div className="status-neutral rounded-xl px-4 py-3 text-sm">No membership assigned yet</div>;
+    return (
+      <div className="status-neutral rounded-xl px-4 py-3 text-sm">No membership assigned yet</div>
+    );
   }
   if (membership.status === "expired") {
     return (
@@ -297,13 +412,15 @@ function MembershipBanner({ membership }: { membership: MembershipSummary | null
   if (membership.status === "expiring") {
     return (
       <div className="status-warning rounded-xl px-4 py-3 text-sm">
-        ⚠ Expires in {membership.days_left} days - {membership.end_date ? formatDateShortIST(membership.end_date) : "-"}
+        ⚠ Expires in {membership.days_left} days -{" "}
+        {membership.end_date ? formatDateShortIST(membership.end_date) : "-"}
       </div>
     );
   }
   return (
     <div className="status-success rounded-xl px-4 py-3 text-sm">
-      Active until {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} ({membership.days_left} days left)
+      Active until {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} (
+      {membership.days_left} days left)
     </div>
   );
 }
@@ -312,8 +429,7 @@ function Card({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4">
       <div className="text-xs font-medium text-zinc-600">{label}</div>
-      <div className="mt-1 text-sm text-zinc-900 whitespace-pre-wrap">{value}</div>
+      <div className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{value}</div>
     </div>
   );
 }
-

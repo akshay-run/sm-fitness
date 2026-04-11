@@ -6,7 +6,7 @@ Use this as a quick pre-flight list. For a **numbered walkthrough** (install →
 
 1. Copy the template: `cp .env.example .env.local` (from repo root).
 2. Fill every variable in the table below.
-3. In Supabase: tables, RLS, RPCs, `admins` row for your user, storage bucket (default name: `sm-fitness-member-photo`).
+3. In Supabase: tables, RLS, RPCs, run [`supabase/migrations/001_sm_fitness_extensions.sql`](../supabase/migrations/001_sm_fitness_extensions.sql), `admins` row for your user ([`supabase/seed_admin_example.sql`](../supabase/seed_admin_example.sql)), storage buckets `sm-fitness-member-photo` and `gym-assets` (or set `SUPABASE_*_BUCKET` overrides).
 4. Run `npm install` then `npm run dev` and complete [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) for your environment.
 
 ## Variables to fill
@@ -22,6 +22,7 @@ Use this as a quick pre-flight list. For a **numbered walkthrough** (install →
 | `NEXT_PUBLIC_GYM_NAME` | [ ] |
 | `CRON_SECRET` | [ ] |
 | `SUPABASE_MEMBER_PHOTO_BUCKET` (optional; default `sm-fitness-member-photo`) | [ ] |
+| `SUPABASE_GYM_ASSETS_BUCKET` (optional; default `gym-assets`) | [ ] |
 
 ## Where to get values (summary)
 

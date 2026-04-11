@@ -8,7 +8,7 @@ const schema = z.object({
   fee_charged: z.coerce.number().positive("Enter a valid fee"),
 });
 
-type Plan = { id: string; name: string; duration_months: number };
+type Plan = { id: string; name: string; duration_months: number; default_price?: number | null };
 
 export function MembershipForm({
   memberId,
@@ -32,6 +32,13 @@ export function MembershipForm({
 
   useEffect(() => {
     if (!planId && plans[0]?.id) setPlanId(plans[0].id);
+  }, [planId, plans]);
+
+  useEffect(() => {
+    const p = plans.find((x) => x.id === planId);
+    if (p?.default_price != null && p.default_price > 0) {
+      setFee(String(Math.round(p.default_price)));
+    }
   }, [planId, plans]);
 
   async function submit(e: React.FormEvent) {
@@ -91,6 +98,9 @@ export function MembershipForm({
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.duration_months} mo)
+                {p.default_price != null && p.default_price > 0
+                  ? ` — default ₹${p.default_price}`
+                  : ""}
               </option>
             ))}
           </select>

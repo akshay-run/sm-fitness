@@ -10,12 +10,19 @@ vi.mock("@/lib/supabaseAdmin", () => ({
       if (table !== "plans") throw new Error(`Unexpected table ${table}`);
       return {
         select: () => ({
-          eq: () => ({
-            order: async () =>
+          order: () => ({
+            eq: async () =>
               plansDbError
                 ? { data: null, error: { message: "db failed" } }
                 : {
-                    data: [{ id: "p1", name: "Monthly", duration_months: 1 }],
+                    data: [
+                      {
+                        id: "p1",
+                        name: "Monthly",
+                        duration_months: 1,
+                        default_price: 1200,
+                      },
+                    ],
                     error: null,
                   },
           }),
@@ -32,7 +39,7 @@ describe("GET /api/plans", () => {
 
   it("returns active plans", async () => {
     const { GET } = await import("@/app/api/plans/route");
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/plans"));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.plans).toHaveLength(1);
@@ -41,7 +48,7 @@ describe("GET /api/plans", () => {
   it("returns 500 when db query fails", async () => {
     plansDbError = true;
     const { GET } = await import("@/app/api/plans/route");
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/plans"));
     expect(res.status).toBe(500);
   });
 });

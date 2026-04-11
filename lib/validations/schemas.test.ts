@@ -8,6 +8,7 @@ describe("validation schemas", () => {
       full_name: "Aman Sharma",
       mobile: "9876543210",
       email: "aman@example.com",
+      joining_date: "2026-01-15",
     });
     expect(ok.success).toBe(true);
   });

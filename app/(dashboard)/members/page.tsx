@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDateShortIST } from "@/lib/uiFormat";
-import { reminderMessage, smsLink, whatsappLink } from "@/lib/messageTemplates";
+import {
+  membershipRenewalReminderMessage,
+  reminderMessage,
+  smsLink,
+  whatsappLink,
+} from "@/lib/messageTemplates";
 
 type MemberListItem = {
   id: string;
@@ -33,16 +39,32 @@ export default function MembersPage() {
   const q = searchParams.get("q") ?? "";
   const page = Number(searchParams.get("page") ?? "1");
   const is_active = searchParams.get("is_active") ?? "true";
+  const expiring_within_days = searchParams.get("expiring_within_days");
 
   const [inputQ, setInputQ] = useState(q);
-  const [data, setData] = useState<MemberListResponse>({
+  const emptyData: MemberListResponse = {
     items: [],
     page: 1,
     pageSize: 20,
     total: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  };
+  const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings", { cache: "no-store" });
+        const json = await res.json();
+        if (res.ok && json.gym_name && !cancelled) setGymName(String(json.gym_name));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setInputQ(q);
@@ -54,45 +76,73 @@ export default function MembersPage() {
     sp.set("pageSize", "20");
     if (q) sp.set("q", q);
     if (is_active) sp.set("is_active", is_active);
+    if (expiring_within_days) sp.set("expiring_within_days", expiring_within_days);
     return sp.toString();
-  }, [q, page, is_active]);
+  }, [q, page, is_active, expiring_within_days]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
+  const {
+    data: queryData,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["members", queryString],
+    queryFn: async () => {
       const res = await fetch(`/api/members?${queryString}`, { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (!cancelled) setError(json?.error ?? "Failed to load members");
-      } else if (!cancelled) {
-        setData({
-          items: json.items ?? [],
-          page: json.page ?? 1,
-          pageSize: json.pageSize ?? 20,
-          total: json.total ?? 0,
-        });
-      }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [queryString]);
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load members");
+      return json as MemberListResponse;
+    },
+  });
+
+  const data = queryData ?? emptyData;
+  const error = queryError instanceof Error ? queryError.message : null;
 
   const totalPages = Math.max(1, Math.ceil((data.total ?? 0) / (data.pageSize ?? 20)));
 
-  const navigate = useCallback((next: { q?: string; page?: number; is_active?: string }) => {
-    const sp = new URLSearchParams();
-    const nq = next.q ?? q;
-    const np = next.page ?? page;
-    const ns = next.is_active ?? is_active;
-    if (nq) sp.set("q", nq);
-    sp.set("page", String(Math.max(1, np)));
-    sp.set("is_active", ns);
-    router.push(`${pathname}?${sp.toString()}`);
-  }, [is_active, page, pathname, q, router]);
+  function reminderForMember(m: MemberListItem) {
+    const end = m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "";
+    if (!end) {
+      return reminderMessage({
+        name: m.full_name,
+        endDate: "",
+        daysLeft: m.membership_days_left ?? 0,
+      });
+    }
+    if (m.membership_status === "expired" || (m.membership_days_left ?? 0) <= 0) {
+      return reminderMessage({
+        name: m.full_name,
+        endDate: end,
+        daysLeft: 0,
+      });
+    }
+    return membershipRenewalReminderMessage({
+      memberName: m.full_name,
+      expiryDate: end,
+      gymName,
+    });
+  }
+
+  const navigate = useCallback(
+    (next: {
+      q?: string;
+      page?: number;
+      is_active?: string;
+      expiring_within_days?: string | null;
+    }) => {
+      const sp = new URLSearchParams();
+      const nq = next.q ?? q;
+      const np = next.page ?? page;
+      const ns = next.is_active ?? is_active;
+      const ne =
+        next.expiring_within_days !== undefined ? next.expiring_within_days : expiring_within_days;
+      if (nq) sp.set("q", nq);
+      sp.set("page", String(Math.max(1, np)));
+      sp.set("is_active", ns);
+      if (ne) sp.set("expiring_within_days", ne);
+      router.push(`${pathname}?${sp.toString()}`);
+    },
+    [expiring_within_days, is_active, page, pathname, q, router]
+  );
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -135,7 +185,7 @@ export default function MembersPage() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => navigate({ is_active: "true", page: 1 })}
+            onClick={() => navigate({ is_active: "true", page: 1, expiring_within_days: null })}
             className={[
               "rounded-lg px-3 py-2 text-sm",
               is_active !== "false"
@@ -147,7 +197,7 @@ export default function MembersPage() {
           </button>
           <button
             type="button"
-            onClick={() => navigate({ is_active: "false", page: 1 })}
+            onClick={() => navigate({ is_active: "false", page: 1, expiring_within_days: null })}
             className={[
               "rounded-lg px-3 py-2 text-sm",
               is_active === "false"
@@ -197,27 +247,13 @@ export default function MembersPage() {
                 {m.membership_status === "active" || m.membership_status === "expiring" ? (
                   <div className="flex items-center gap-2">
                     <a
-                      href={whatsappLink(
-                        m.mobile,
-                        reminderMessage({
-                          name: m.full_name,
-                          endDate: m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "",
-                          daysLeft: m.membership_days_left ?? 0,
-                        })
-                      )}
+                      href={whatsappLink(m.mobile, reminderForMember(m))}
                       className="status-success rounded px-2 py-1 text-xs"
                     >
                       WhatsApp
                     </a>
                     <a
-                      href={smsLink(
-                        m.mobile,
-                        reminderMessage({
-                          name: m.full_name,
-                          endDate: m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "",
-                          daysLeft: m.membership_days_left ?? 0,
-                        })
-                      )}
+                      href={smsLink(m.mobile, reminderForMember(m))}
                       className="status-info rounded px-2 py-1 text-xs"
                     >
                       SMS

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import { UPIQRModal } from "@/components/payments/UPIQRModal";
 
@@ -27,9 +28,31 @@ export function PaymentForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
+  const [settingsUpi, setSettingsUpi] = useState<string | null>(null);
+  const [uploadedQrUrl, setUploadedQrUrl] = useState<string | null>(null);
+  const [settingsGymName, setSettingsGymName] = useState<string | null>(null);
 
-  const upiId = process.env.NEXT_PUBLIC_UPI_ID || "";
-  const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings", { cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok || cancelled) return;
+        if (json.upi_id) setSettingsUpi(String(json.upi_id));
+        if (json.upi_qr_signed_url) setUploadedQrUrl(json.upi_qr_signed_url);
+        if (json.gym_name) setSettingsGymName(String(json.gym_name));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const upiId = settingsUpi || process.env.NEXT_PUBLIC_UPI_ID || "";
+  const gymName = settingsGymName || process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
 
   const upiUrl = useMemo(() => {
     const pn = encodeURIComponent(gymName);
@@ -46,8 +69,8 @@ export function PaymentForm({
     e.preventDefault();
     setError(null);
 
-    if (mode === "upi" && !upiId) {
-      setError("Missing NEXT_PUBLIC_UPI_ID in env");
+    if (mode === "upi" && !upiId && !uploadedQrUrl) {
+      setError("Configure UPI ID or upload a UPI QR in Settings.");
       return;
     }
 
@@ -75,6 +98,7 @@ export function PaymentForm({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Failed to record payment");
+      toast.success("Payment recorded");
       onCreated(json.id);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to record payment");
@@ -191,7 +215,12 @@ export function PaymentForm({
         </button>
       </form>
 
-      <UPIQRModal open={qrOpen} upiUrl={upiUrl} onClose={() => setQrOpen(false)} />
+      <UPIQRModal
+        open={qrOpen}
+        upiUrl={upiUrl}
+        uploadedQrUrl={uploadedQrUrl}
+        onClose={() => setQrOpen(false)}
+      />
     </div>
   );
 }

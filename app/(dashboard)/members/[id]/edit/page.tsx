@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { MemberForm } from "@/components/members/MemberForm";
 import type { CreateMemberInput } from "@/lib/validations/member.schema";
+import { todayISTDateString } from "@/lib/dateUtils";
 
 type Member = {
   id: string;
@@ -13,8 +15,8 @@ type Member = {
   date_of_birth: string | null;
   gender: "male" | "female" | "other" | null;
   address: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
+  blood_group: string | null;
+  joining_date: string | null;
   notes: string | null;
 };
 
@@ -61,6 +63,7 @@ export default function EditMemberPage({
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.error ?? "Failed to update member");
 
+    toast.success("Member updated");
     router.replace(`/members/${member.id}`);
     router.refresh();
   }
@@ -85,6 +88,11 @@ export default function EditMemberPage({
 
   if (!member) return null;
 
+  const jd =
+    member.joining_date && String(member.joining_date).length >= 8
+      ? String(member.joining_date).slice(0, 10)
+      : todayISTDateString();
+
   return (
     <div className="mx-auto w-full max-w-3xl p-6">
       <div className="mb-6">
@@ -102,9 +110,9 @@ export default function EditMemberPage({
             date_of_birth: member.date_of_birth ?? "",
             gender: member.gender ?? undefined,
             address: member.address ?? "",
-            emergency_contact_name: member.emergency_contact_name ?? "",
-            emergency_contact_phone: member.emergency_contact_phone ?? "",
+            blood_group: (member.blood_group ?? "") as CreateMemberInput["blood_group"],
             notes: member.notes ?? "",
+            joining_date: jd,
           }}
           submitLabel="Save changes"
           onSubmit={save}
@@ -113,4 +121,3 @@ export default function EditMemberPage({
     </div>
   );
 }
-

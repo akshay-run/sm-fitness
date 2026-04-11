@@ -72,6 +72,14 @@ Use the **same** value in Vercel environment variables and in your cron configur
 
 Create this bucket in Supabase if it does not exist. The app uploads member images here and signs URLs for display. `next.config.ts` uses `NEXT_PUBLIC_SUPABASE_URL` to allow `next/image` for signed storage URLs.
 
+### Gym logo and UPI QR — Storage bucket (optional override)
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_GYM_ASSETS_BUCKET` | Name of the **private** bucket for gym logo and UPI QR uploads (Settings). Default: `gym-assets`. |
+
+Create this bucket if it does not exist. Uploads use the service role from API routes ([`app/api/settings/logo`](../app/api/settings/logo/route.ts), [`app/api/settings/upi-qr`](../app/api/settings/upi-qr/route.ts)).
+
 ## Minimal `.env.local` template
 
 ```env
@@ -88,6 +96,7 @@ NEXT_PUBLIC_GYM_NAME=SM FITNESS
 CRON_SECRET=
 
 SUPABASE_MEMBER_PHOTO_BUCKET=sm-fitness-member-photo
+SUPABASE_GYM_ASSETS_BUCKET=gym-assets
 ```
 
 ## Local vs production (Vercel)
@@ -106,9 +115,9 @@ SUPABASE_MEMBER_PHOTO_BUCKET=sm-fitness-member-photo
 
 Environment variables alone are not enough. You must also:
 
-1. Create tables, RLS policies, and seed data per project documentation.
-2. Add your logged-in user’s UUID to the `admins` table (strict admin access).
-3. Create the storage bucket matching `SUPABASE_MEMBER_PHOTO_BUCKET` (default `sm-fitness-member-photo`), private, with policies allowing the service role uploads used by the API.
+1. Create tables, RLS policies, and seed data per project documentation, then run [`supabase/migrations/001_sm_fitness_extensions.sql`](../supabase/migrations/001_sm_fitness_extensions.sql) for `gym_settings` and member/plan extensions.
+2. Add your logged-in user’s UUID to the `admins` table (strict admin access). See [`supabase/seed_admin_example.sql`](../supabase/seed_admin_example.sql).
+3. Create storage buckets: `SUPABASE_MEMBER_PHOTO_BUCKET` (default `sm-fitness-member-photo`) and `SUPABASE_GYM_ASSETS_BUCKET` (default `gym-assets`), private; the API uses the service role for uploads.
 4. Deploy SQL RPC functions `next_member_code()` and `next_receipt_number()` and seed counter rows.
 
 See [README.md](../README.md) (Supabase prerequisites and DB safeguards) and [`UAT_CHECKLIST.md`](./UAT_CHECKLIST.md).
@@ -119,6 +128,7 @@ See [README.md](../README.md) (Supabase prerequisites and DB safeguards) and [`U
 |---------|----------------|
 | Login works but dashboard kicks you out | User not in `admins` table. |
 | `Bucket not found` on photo upload | Bucket name mismatch; set `SUPABASE_MEMBER_PHOTO_BUCKET` or create the default bucket. |
+| `Bucket not found` on Settings logo/QR | Create `gym-assets` or set `SUPABASE_GYM_ASSETS_BUCKET` to your bucket name. |
 | `Invalid src prop` for member photo | `NEXT_PUBLIC_SUPABASE_URL` missing or wrong in build; image host comes from this URL. |
 | Cron returns 401 | Missing or wrong `x-cron-secret` header, or `CRON_SECRET` not set on the server. |
 | Emails not sending | Wrong `GMAIL_USER` / app password, or Gmail blocking sign-in. |

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import { AutoLogout } from "@/components/auth/AutoLogout";
 import { DashboardSidebar } from "@/components/navigation/DashboardSidebar";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export default async function DashboardLayout({
   children,
@@ -34,8 +35,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <AutoLogout />
-      <DashboardSidebar>{children}</DashboardSidebar>
+      <QueryProvider>
+        <AutoLogout />
+        <DashboardSidebar>{children}</DashboardSidebar>
+      </QueryProvider>
     </div>
   );
 }

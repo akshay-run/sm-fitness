@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { updateMemberSchema } from "@/lib/validations/member.schema";
+import { ageFromDateOfBirth } from "@/lib/memberAge";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -89,9 +90,37 @@ export async function GET(
     .order("payment_date", { ascending: false })
     .limit(3);
 
+  const { data: allMemberships } = await supabaseAdmin
+    .from("memberships")
+    .select("id, plan_id, fee_charged, start_date, end_date, status")
+    .eq("member_id", parsedParams.data.id)
+    .order("end_date", { ascending: false });
+
+  const histPlanIds = Array.from(
+    new Set((allMemberships ?? []).map((m) => String(m.plan_id)))
+  );
+  const { data: histPlans } = histPlanIds.length
+    ? await supabaseAdmin.from("plans").select("id, name").in("id", histPlanIds)
+    : { data: [] as { id: string; name: string }[] };
+  const histPlanMap = new Map((histPlans ?? []).map((p) => [String(p.id), p.name]));
+
+  const membershipHistory = (allMemberships ?? []).map((row) => ({
+    id: row.id,
+    plan_name: histPlanMap.get(String(row.plan_id)) ?? "Plan",
+    fee_charged: Number(row.fee_charged ?? 0),
+    start_date: row.start_date,
+    end_date: row.end_date,
+    status: row.status,
+  }));
+
+  const dob = data?.date_of_birth ? String(data.date_of_birth).slice(0, 10) : null;
+  const ageYears = ageFromDateOfBirth(dob);
+
   return NextResponse.json({
     member: data,
     photoSignedUrl,
+    ageYears,
+    membershipHistory,
     membershipSummary: latestMembership
       ? {
           plan_name: plan?.name ?? "Membership",
@@ -136,21 +165,17 @@ export async function PATCH(
   }
 
   const supabaseAdmin = createSupabaseAdminClient();
-  const patch: Record<string, unknown> = {
-    ...parsedBody.data,
-    email: parsedBody.data.email === "" ? null : parsedBody.data.email,
-    date_of_birth: parsedBody.data.date_of_birth === "" ? null : parsedBody.data.date_of_birth,
-    address: parsedBody.data.address === "" ? null : parsedBody.data.address,
-    emergency_contact_name:
-      parsedBody.data.emergency_contact_name === ""
-        ? null
-        : parsedBody.data.emergency_contact_name,
-    emergency_contact_phone:
-      parsedBody.data.emergency_contact_phone === ""
-        ? null
-        : parsedBody.data.emergency_contact_phone,
-    notes: parsedBody.data.notes === "" ? null : parsedBody.data.notes,
-  };
+  const patch: Record<string, unknown> = {};
+  const src = parsedBody.data;
+  if (src.full_name !== undefined) patch.full_name = src.full_name;
+  if (src.mobile !== undefined) patch.mobile = src.mobile;
+  if (src.email !== undefined) patch.email = src.email === "" ? null : src.email;
+  if (src.date_of_birth !== undefined) patch.date_of_birth = src.date_of_birth === "" ? null : src.date_of_birth;
+  if (src.gender !== undefined) patch.gender = src.gender ?? null;
+  if (src.address !== undefined) patch.address = src.address === "" ? null : src.address;
+  if (src.blood_group !== undefined) patch.blood_group = src.blood_group ?? null;
+  if (src.notes !== undefined) patch.notes = src.notes === "" ? null : src.notes;
+  if (src.joining_date !== undefined) patch.joining_date = src.joining_date === "" ? null : src.joining_date;
 
   const { data, error: dbError } = await supabaseAdmin
     .from("members")

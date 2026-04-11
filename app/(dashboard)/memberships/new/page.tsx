@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { MembershipForm } from "@/components/memberships/MembershipForm";
 
 type Plan = { id: string; name: string; duration_months: number };
@@ -90,6 +91,7 @@ export default function NewMembershipPage() {
             memberId={memberId}
             plans={plans}
             onCreated={({ id }) => {
+              toast.success("Membership created");
               router.replace(`/payments?membershipId=${id}`);
               router.refresh();
             }}

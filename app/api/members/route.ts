@@ -16,6 +16,7 @@ const listQuerySchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
+  expiring_within_days: z.coerce.number().int().min(1).max(90).optional(),
 });
 
 export async function GET(req: Request) {
@@ -28,16 +29,53 @@ export async function GET(req: Request) {
     page: url.searchParams.get("page") ?? undefined,
     pageSize: url.searchParams.get("pageSize") ?? undefined,
     is_active: url.searchParams.get("is_active") ?? undefined,
+    expiring_within_days: url.searchParams.get("expiring_within_days") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const { q, page, pageSize, is_active } = parsed.data;
+  const { q, page, pageSize, is_active, expiring_within_days } = parsed.data;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
   const supabaseAdmin = createSupabaseAdminClient();
+
+  const today = new Date();
+  const todayIST = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(today);
+
+  let memberIdsFilter: string[] | null = null;
+  if (expiring_within_days != null) {
+    const cap = new Date(`${todayIST}T00:00:00+05:30`);
+    cap.setDate(cap.getDate() + expiring_within_days);
+    const capStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(cap);
+
+    const { data: memRows } = await supabaseAdmin
+      .from("memberships")
+      .select("member_id")
+      .gte("end_date", todayIST)
+      .lte("end_date", capStr)
+      .neq("status", "cancelled");
+    memberIdsFilter = [...new Set((memRows ?? []).map((r) => String(r.member_id)))];
+    if (memberIdsFilter.length === 0) {
+      return NextResponse.json({
+        items: [],
+        page,
+        pageSize,
+        total: 0,
+      });
+    }
+  }
 
   let query = supabaseAdmin
     .from("members")
@@ -48,6 +86,7 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: false });
 
   if (typeof is_active === "boolean") query = query.eq("is_active", is_active);
+  if (memberIdsFilter) query = query.in("id", memberIdsFilter);
   if (q && q.trim()) {
     const qq = q.trim();
     query = query.or(`full_name.ilike.%${qq}%,mobile.ilike.%${qq}%`);
@@ -55,14 +94,6 @@ export async function GET(req: Request) {
 
   const { data, error: dbError, count } = await query.range(from, to);
   if (dbError) return internalServerError("Failed to load members");
-
-  const today = new Date();
-  const todayIST = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(today);
 
   const items = (data ?? []) as Array<{
     id: string;
@@ -179,16 +210,12 @@ export async function POST(req: Request) {
     member_code,
     full_name: parsed.data.full_name,
     mobile: parsed.data.mobile,
-    email: parsed.data.email ? parsed.data.email : null,
+    email: parsed.data.email,
     date_of_birth: parsed.data.date_of_birth ? parsed.data.date_of_birth : null,
     gender: parsed.data.gender ?? null,
     address: parsed.data.address ? parsed.data.address : null,
-    emergency_contact_name: parsed.data.emergency_contact_name
-      ? parsed.data.emergency_contact_name
-      : null,
-    emergency_contact_phone: parsed.data.emergency_contact_phone
-      ? parsed.data.emergency_contact_phone
-      : null,
+    blood_group: parsed.data.blood_group ?? null,
+    joining_date: parsed.data.joining_date,
     notes: parsed.data.notes ? parsed.data.notes : null,
     is_active: true,
   };

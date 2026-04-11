@@ -147,6 +147,7 @@ describe("members route", () => {
         full_name: "New User",
         mobile: "9876543210",
         email: "new@example.com",
+        joining_date: "2026-04-11",
       }),
     });
     const res = await POST(req);
@@ -167,6 +168,8 @@ describe("members route", () => {
       body: JSON.stringify({
         full_name: "New User",
         mobile: "9876543210",
+        email: "x@example.com",
+        joining_date: "2026-04-11",
       }),
     });
     const res = await POST(req);

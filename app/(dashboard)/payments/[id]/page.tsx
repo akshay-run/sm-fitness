@@ -23,6 +23,13 @@ type Member = { id: string; full_name: string; member_code: string; mobile: stri
 type Membership = { id: string; start_date: string; end_date: string };
 type Plan = { name: string };
 
+type GymBranding = {
+  gym_name: string;
+  address: string | null;
+  phone: string | null;
+  logo_signed_url: string | null;
+};
+
 export default function PaymentDetailPage({
   params,
 }: {
@@ -37,6 +44,7 @@ export default function PaymentDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [gym, setGym] = useState<GymBranding | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +63,7 @@ export default function PaymentDetailPage({
           setMember(json.member ?? null);
           setMembership(json.membership ?? null);
           setPlan(json.plan ?? null);
+          setGym(json.gym ?? null);
         }
       }
       if (!cancelled) setLoading(false);
@@ -127,8 +136,24 @@ export default function PaymentDetailPage({
       ) : null}
 
       <div className="card-surface mt-6 rounded-2xl border border-zinc-200 p-5">
-        <div className="text-xl font-semibold text-[#1A1A2E]">SM FITNESS</div>
+        {gym?.logo_signed_url ? (
+          <div className="mb-3 flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={gym.logo_signed_url}
+              alt=""
+              className="max-h-16 w-auto object-contain"
+            />
+          </div>
+        ) : null}
+        <div className="text-xl font-semibold text-[#1A1A2E]">{gym?.gym_name ?? "SM FITNESS"}</div>
         <div className="text-sm text-slate-500">Payment Receipt</div>
+        {gym?.address ? (
+          <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{gym.address}</div>
+        ) : null}
+        {gym?.phone ? (
+          <div className="mt-1 text-xs text-slate-600">Phone: {gym.phone}</div>
+        ) : null}
         <div className="my-3 border-t border-zinc-200" />
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold">{payment.receipt_number}</span>

@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/members", label: "Members", short: "MB" },
   { href: "/payments", label: "Payments", short: "PY" },
   { href: "/reports", label: "Reports", short: "RP" },
+  { href: "/settings", label: "Settings", short: "ST" },
 ] as const;
 
 function itemClass(isActive: boolean, collapsed: boolean) {
@@ -161,11 +162,20 @@ export function DashboardSidebar({ children }: Props) {
       ) : null}
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-200 bg-white md:hidden">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {NAV_ITEMS.map((item, idx) => {
             const isActive =
               pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-            const icon = idx === 0 ? "🏠" : idx === 1 ? "👥" : idx === 2 ? "💳" : "📊";
+            const icon =
+              idx === 0
+                ? "🏠"
+                : idx === 1
+                  ? "👥"
+                  : idx === 2
+                    ? "💳"
+                    : idx === 3
+                      ? "📊"
+                      : "⚙️";
             return (
               <Link
                 key={item.href}

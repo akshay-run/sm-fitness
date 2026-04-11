@@ -48,6 +48,15 @@ export function formatAmountINR(value: number | string) {
   return amountFmt.format(Number(value || 0));
 }
 
+/**
+ * INR formatted with ASCII-only prefix for PDF generators (jsPDF Helvetica)
+ * that do not embed Unicode fonts — avoids garbled rupee symbols.
+ */
+export function formatAmountPdfINR(value: number | string): string {
+  const n = Number(value || 0);
+  return `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 0, minimumFractionDigits: 0 })}`;
+}
+
 function normalizeDateInput(input: string | Date) {
   if (input instanceof Date) return input;
   if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {

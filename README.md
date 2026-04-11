@@ -95,9 +95,10 @@ Open `http://localhost:3000`.
 Before full flows work:
 
 - Tables: `members`, `memberships`, `payments`, `plans`, `email_logs`, `admins`, counter tables as per your schema.
-- **Admin access:** Insert your auth user’s UUID into `admins` (the app denies dashboard/API access otherwise).
+- **Extension migration:** Run [`supabase/migrations/001_sm_fitness_extensions.sql`](supabase/migrations/001_sm_fitness_extensions.sql) for `gym_settings`, `plans.default_price`, member fields, etc. (see [`supabase/README.md`](supabase/README.md)).
+- **Admin access:** Insert your auth user’s UUID into `admins` (the app denies dashboard/API access otherwise). Template: [`supabase/seed_admin_example.sql`](supabase/seed_admin_example.sql).
 - Seed `plans` (e.g. Monthly, Quarterly, Half-Yearly, Annual).
-- **Storage:** Private bucket whose name matches `SUPABASE_MEMBER_PHOTO_BUCKET` (default `sm-fitness-member-photo`).
+- **Storage:** Private buckets — `SUPABASE_MEMBER_PHOTO_BUCKET` (default `sm-fitness-member-photo`) and `SUPABASE_GYM_ASSETS_BUCKET` (default `gym-assets` for Settings logo/QR).
 - RLS policies appropriate for your security model.
 - RPC: `next_member_code()`, `next_receipt_number()` with seeded counter rows.
 

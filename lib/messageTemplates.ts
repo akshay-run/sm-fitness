@@ -30,6 +30,26 @@ Thank you for your payment! 💪
 – SM FITNESS`;
 }
 
+export function membershipRenewalReminderMessage(params: {
+  memberName: string;
+  expiryDate: string;
+  gymName?: string;
+}): string {
+  const gym = params.gymName?.trim() || "SM FITNESS";
+  return `Hello ${params.memberName} 👋
+
+This is a reminder from *${gym}* 🏋️
+
+Your gym membership is expiring on *${params.expiryDate}*.
+
+Please renew before it expires to continue your fitness journey without interruption 💪
+
+For renewal, contact us or visit the gym.
+
+Thank you!
+— ${gym} Team`;
+}
+
 export function reminderMessage(params: {
   name: string;
   endDate: string;

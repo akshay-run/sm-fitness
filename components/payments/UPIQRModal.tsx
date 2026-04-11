@@ -6,10 +6,12 @@ import QRCode from "qrcode";
 export function UPIQRModal({
   open,
   upiUrl,
+  uploadedQrUrl,
   onClose,
 }: {
   open: boolean;
   upiUrl: string;
+  uploadedQrUrl?: string | null;
   onClose: () => void;
 }) {
   const [dataUrl, setDataUrl] = useState<string>("");
@@ -57,8 +59,11 @@ export function UPIQRModal({
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-center">
-          {dataUrl ? (
+        <div className="mt-4 flex flex-col items-center justify-center gap-3">
+          {uploadedQrUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={uploadedQrUrl} alt="Gym UPI QR" className="h-60 w-60 object-contain" />
+          ) : dataUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={dataUrl} alt="UPI QR" className="h-60 w-60" />
           ) : (

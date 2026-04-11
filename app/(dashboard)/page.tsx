@@ -1,8 +1,25 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { startOfMonth, subMonths } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { addDaysIST, monthBoundsIST, previousMonthBoundsIST, todayISTDateString } from "@/lib/dateUtils";
+import {
+  IST_TZ,
+  addDaysIST,
+  monthBoundsIST,
+  previousMonthBoundsIST,
+  todayISTDateString,
+} from "@/lib/dateUtils";
 import { formatAmountINR, formatDateLongIST, formatDateShortIST } from "@/lib/uiFormat";
-import { reminderMessage, whatsappLink, receiptMessage, smsLink } from "@/lib/messageTemplates";
+import {
+  membershipRenewalReminderMessage,
+  receiptMessage,
+  reminderMessage,
+  smsLink,
+  whatsappLink,
+} from "@/lib/messageTemplates";
+import { BulkRenewalReminders } from "@/components/dashboard/BulkRenewalReminders";
+import { RevenueMiniChart } from "@/components/dashboard/RevenueMiniChart";
 
 type UpcomingRow = {
   membership_id: string;
@@ -14,6 +31,11 @@ type UpcomingRow = {
 };
 
 type PaymentAmountRow = { amount: number | string | null };
+export const metadata: Metadata = {
+  title: "Dashboard — SM FITNESS",
+  description: "Gym overview and renewals",
+};
+
 type RecentPaymentRow = {
   id: string;
   membership_id: string;
@@ -148,6 +170,26 @@ export default async function DashboardHome() {
 
   const trendUp = thisMonthRevenue >= lastMonthRevenue;
 
+  const revenueLast6: { month: string; total: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const ref = subMonths(startOfMonth(new Date()), i);
+    const { startIST, endIST } = monthBoundsIST(ref);
+    const { data: monthPay } = await supabaseAdmin
+      .from("payments")
+      .select("amount")
+      .gte("payment_date", startIST)
+      .lt("payment_date", endIST);
+    const total =
+      (monthPay as PaymentAmountRow[] | null)?.reduce((sum, p) => sum + Number(p.amount ?? 0), 0) ??
+      0;
+    revenueLast6.push({
+      month: formatInTimeZone(ref, IST_TZ, "MMM yy"),
+      total,
+    });
+  }
+
+  const gymBrand = process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS";
+
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -177,13 +219,18 @@ export default async function DashboardHome() {
           value={String(expiredMemberships ?? 0)}
           pulse={(expiredMemberships ?? 0) > 0}
         />
-        <StatCard
-          icon="🔔"
-          tint="status-warning"
-          label="Expiring in 7d"
-          value={String(expiringSoonMemberships ?? 0)}
-          pulse={(expiringSoonMemberships ?? 0) > 0}
-        />
+        <Link
+          href="/members?expiring_within_days=7"
+          className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+        >
+          <StatCard
+            icon="🔔"
+            tint="status-warning"
+            label="Expiring in 7d"
+            value={String(expiringSoonMemberships ?? 0)}
+            pulse={(expiringSoonMemberships ?? 0) > 0}
+          />
+        </Link>
       </div>
 
       <div className="card-surface mt-4 rounded-2xl border border-zinc-200 p-5">
@@ -196,6 +243,7 @@ export default async function DashboardHome() {
           <div className={trendUp ? "text-green-700" : "text-red-700"}>{trendUp ? "↗" : "↘"}</div>
         </div>
         <div className="mt-1 text-sm text-slate-500">Last month {formatAmountINR(lastMonthRevenue)}</div>
+        <RevenueMiniChart data={revenueLast6} />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -203,7 +251,10 @@ export default async function DashboardHome() {
           <div className="card-surface rounded-2xl border border-zinc-200 p-5">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-[#1A1A2E]">Upcoming renewals (7 days)</div>
-              <Link href="/members" className="text-sm font-medium underline underline-offset-4">
+              <Link
+                href="/members?expiring_within_days=7"
+                className="text-sm font-medium underline underline-offset-4"
+              >
                 View all
               </Link>
             </div>
@@ -231,17 +282,10 @@ export default async function DashboardHome() {
                         <a
                           href={whatsappLink(
                             r.mobile,
-                            reminderMessage({
-                              name: r.full_name,
-                              endDate: formatDateShortIST(r.end_date),
-                              daysLeft: Math.max(
-                                0,
-                                Math.ceil(
-                                  (new Date(`${r.end_date}T00:00:00+05:30`).getTime() -
-                                    new Date(`${today}T00:00:00+05:30`).getTime()) /
-                                    (1000 * 60 * 60 * 24)
-                                )
-                              ),
+                            membershipRenewalReminderMessage({
+                              memberName: r.full_name,
+                              expiryDate: formatDateShortIST(r.end_date),
+                              gymName: gymBrand,
                             })
                           )}
                           className="status-success rounded px-2 py-1 text-xs"
@@ -251,17 +295,10 @@ export default async function DashboardHome() {
                         <a
                           href={smsLink(
                             r.mobile,
-                            reminderMessage({
-                              name: r.full_name,
-                              endDate: formatDateShortIST(r.end_date),
-                              daysLeft: Math.max(
-                                0,
-                                Math.ceil(
-                                  (new Date(`${r.end_date}T00:00:00+05:30`).getTime() -
-                                    new Date(`${today}T00:00:00+05:30`).getTime()) /
-                                    (1000 * 60 * 60 * 24)
-                                )
-                              ),
+                            membershipRenewalReminderMessage({
+                              memberName: r.full_name,
+                              expiryDate: formatDateShortIST(r.end_date),
+                              gymName: gymBrand,
                             })
                           )}
                           className="status-info rounded px-2 py-1 text-xs"
@@ -279,6 +316,14 @@ export default async function DashboardHome() {
                 </div>
               )}
             </div>
+            <BulkRenewalReminders
+              rows={upcomingRows.map((r) => ({
+                mobile: r.mobile,
+                full_name: r.full_name,
+                end_date: r.end_date,
+              }))}
+              gymName={gymBrand}
+            />
           </div>
         </div>
 

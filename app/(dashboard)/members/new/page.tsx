@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { MemberForm } from "@/components/members/MemberForm";
 import type { CreateMemberInput } from "@/lib/validations/member.schema";
 
@@ -19,6 +20,7 @@ export default function NewMemberPage() {
       throw new Error(json?.error ?? "Failed to create member");
     }
 
+    toast.success("Member created");
     router.replace(`/members/${json.id}`);
     router.refresh();
   }
@@ -30,7 +32,7 @@ export default function NewMemberPage() {
           Add member
         </h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Mobile is required. Email is optional.
+          Mobile and email are required. Other fields are optional.
         </p>
       </div>
 

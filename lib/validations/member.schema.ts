@@ -1,13 +1,18 @@
 import { z } from "zod";
 
-const optionalPhoneSchema = z.preprocess(
-  (value) => {
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed === "" ? undefined : trimmed;
-  },
-  z.string().regex(/^[0-9]{10}$/, "Emergency phone must be 10 digits").optional()
-);
+const bloodGroupSchema = z.enum([
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "O+",
+  "O-",
+  "AB+",
+  "AB-",
+]);
+
+const emptyToUndef = (v: unknown) =>
+  v === "" || v === null || v === undefined ? undefined : v;
 
 export const createMemberSchema = z.object({
   full_name: z.string().trim().min(2, "Full name is required"),
@@ -15,17 +20,19 @@ export const createMemberSchema = z.object({
     .string()
     .trim()
     .regex(/^[0-9]{10}$/, "Mobile must be 10 digits"),
-  email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
   date_of_birth: z.string().optional().or(z.literal("")),
-  gender: z.enum(["male", "female", "other"]).optional(),
+  gender: z.preprocess(emptyToUndef, z.enum(["male", "female", "other"]).optional()),
   address: z.string().trim().max(500).optional().or(z.literal("")),
-  emergency_contact_name: z.string().trim().max(100).optional().or(z.literal("")),
-  emergency_contact_phone: optionalPhoneSchema,
+  blood_group: z.preprocess(emptyToUndef, bloodGroupSchema.optional()),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  joining_date: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Joining date must be a valid date"),
 });
 
 export const updateMemberSchema = createMemberSchema.partial();
 
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
-

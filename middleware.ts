@@ -5,6 +5,9 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith("/login")) return NextResponse.next();
+  if (pathname.startsWith("/auth")) return NextResponse.next();
+  if (pathname.startsWith("/forgot-password")) return NextResponse.next();
+  if (pathname.startsWith("/update-password")) return NextResponse.next();
   if (pathname.startsWith("/api/cron")) return NextResponse.next();
 
   const res = NextResponse.next();
