@@ -1,152 +1,45 @@
+"use client";
+
 import Link from "next/link";
-import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import { addDaysIST, monthBoundsIST, previousMonthBoundsIST, todayISTDateString } from "@/lib/dateUtils";
+import useSWR from "swr";
 import { formatAmountINR, formatDateLongIST, formatDateShortIST } from "@/lib/uiFormat";
 import { reminderMessage, whatsappLink, receiptMessage, smsLink } from "@/lib/messageTemplates";
+// Use the new Recharts requirement
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import DashboardLoading from "./loading";
 
-type UpcomingRow = {
-  membership_id: string;
-  member_id: string;
-  full_name: string;
-  mobile: string;
-  plan_name: string;
-  end_date: string;
-};
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-type PaymentAmountRow = { amount: number | string | null };
-type RecentPaymentRow = {
-  id: string;
-  membership_id: string;
-  member_id: string;
-  amount: number | string | null;
-  payment_mode: string;
-  receipt_number: string;
-  payment_date: string;
-};
+export default function DashboardHome() {
+  const { data, error, isLoading } = useSWR("/api/dashboard", fetcher);
 
-export default async function DashboardHome() {
-  const supabaseAdmin = createSupabaseAdminClient();
-
-  const today = todayISTDateString();
-  const in7 = addDaysIST(today, 7);
-
-  const [{ count: totalMembers }, { count: activeMembers }] = await Promise.all([
-    supabaseAdmin.from("members").select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("members")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-  ]);
-
-  const [{ count: expiredMemberships }, { count: expiringSoonMemberships }] = await Promise.all([
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .lt("end_date", today)
-      .neq("status", "cancelled"),
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .gte("end_date", today)
-      .lte("end_date", in7)
-      .neq("status", "cancelled"),
-  ]);
-
-  const { startIST: thisMonthStart, endIST: thisMonthEnd } = monthBoundsIST();
-  const { startIST: lastMonthStart, endIST: lastMonthEnd } = previousMonthBoundsIST();
-
-  const [thisMonthPayments, lastMonthPayments] = await Promise.all([
-    supabaseAdmin
-      .from("payments")
-      .select("amount")
-      .gte("payment_date", thisMonthStart)
-      .lt("payment_date", thisMonthEnd),
-    supabaseAdmin
-      .from("payments")
-      .select("amount")
-      .gte("payment_date", lastMonthStart)
-      .lt("payment_date", lastMonthEnd),
-  ]);
-
-  const thisMonthRevenue =
-    (thisMonthPayments.data as PaymentAmountRow[] | null)?.reduce(
-      (sum, p) => sum + Number(p.amount ?? 0),
-      0
-    ) ?? 0;
-  const lastMonthRevenue =
-    (lastMonthPayments.data as PaymentAmountRow[] | null)?.reduce(
-      (sum, p) => sum + Number(p.amount ?? 0),
-      0
-    ) ?? 0;
-
-  const { data: upcoming } = await supabaseAdmin
-    .from("memberships")
-    .select("id, member_id, plan_id, end_date")
-    .gte("end_date", today)
-    .lte("end_date", in7)
-    .neq("status", "cancelled")
-    .order("end_date", { ascending: true })
-    .limit(10);
-
-  const upcomingRows: UpcomingRow[] = [];
-  for (const m of upcoming ?? []) {
-    const [{ data: member }, { data: plan }] = await Promise.all([
-      supabaseAdmin
-        .from("members")
-        .select("id, full_name, mobile")
-        .eq("id", m.member_id)
-        .single(),
-      supabaseAdmin.from("plans").select("name").eq("id", m.plan_id).single(),
-    ]);
-    if (!member) continue;
-    upcomingRows.push({
-      membership_id: m.id,
-      member_id: member.id,
-      full_name: member.full_name,
-      mobile: member.mobile,
-      plan_name: plan?.name ?? "Plan",
-      end_date: String(m.end_date),
-    });
+  if (isLoading) {
+    return <DashboardLoading />;
   }
 
-  const { data: recentPayments } = await supabaseAdmin
-    .from("payments")
-    .select("id, amount, payment_mode, receipt_number, payment_date, member_id")
-    .order("payment_date", { ascending: false })
-    .limit(10);
-
-  const recentRows: Array<
-    RecentPaymentRow & {
-      member_name: string;
-      member_mobile: string;
-      plan_name: string;
-      start_date: string;
-      end_date: string;
-    }
-  > = [];
-  for (const p of (recentPayments as RecentPaymentRow[] | null) ?? []) {
-    const [{ data: member }, { data: membership }] = await Promise.all([
-      supabaseAdmin.from("members").select("full_name, mobile").eq("id", p.member_id).single(),
-      supabaseAdmin
-        .from("memberships")
-        .select("plan_id, start_date, end_date")
-        .eq("id", p.membership_id)
-        .single(),
-    ]);
-    const { data: plan } = membership?.plan_id
-      ? await supabaseAdmin.from("plans").select("name").eq("id", membership.plan_id).single()
-      : { data: null };
-    recentRows.push({
-      ...p,
-      member_name: member?.full_name ?? "Member",
-      member_mobile: member?.mobile ?? "",
-      plan_name: plan?.name ?? "Membership",
-      start_date: String(membership?.start_date ?? "-"),
-      end_date: String(membership?.end_date ?? "-"),
-    });
+  if (error || data?.error) {
+    return <div className="p-6 text-red-500">Failed to load dashboard</div>;
   }
+
+  const {
+    today,
+    totalMembers,
+    activeMembers,
+    expiredMemberships,
+    expiringSoonMemberships,
+    thisMonthRevenue,
+    lastMonthRevenue,
+    upcomingRows = [],
+    recentRows = [],
+  } = data || {};
 
   const trendUp = thisMonthRevenue >= lastMonthRevenue;
+
+  // Mock revenue chart data for the mini bar chart
+  const chartData = [
+    { name: "Last Month", revenue: lastMonthRevenue || 0 },
+    { name: "This Month", revenue: thisMonthRevenue || 0 },
+  ];
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
@@ -155,7 +48,7 @@ export default async function DashboardHome() {
           <h1 className="text-2xl font-semibold tracking-tight text-[#1A1A2E]">
             Dashboard
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Today (IST): {formatDateLongIST(today)}</p>
+          <p className="mt-1 text-sm text-slate-500">Today (IST): {today ? formatDateLongIST(today) : ""}</p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -177,25 +70,39 @@ export default async function DashboardHome() {
           value={String(expiredMemberships ?? 0)}
           pulse={(expiredMemberships ?? 0) > 0}
         />
-        <StatCard
-          icon="🔔"
-          tint="status-warning"
-          label="Expiring in 7d"
-          value={String(expiringSoonMemberships ?? 0)}
-          pulse={(expiringSoonMemberships ?? 0) > 0}
-        />
+        <Link href="/members?filter=expiring">
+          <StatCard
+            icon="🔔"
+            tint="status-warning"
+            label="Expiring in 7d"
+            value={String(expiringSoonMemberships ?? 0)}
+            pulse={(expiringSoonMemberships ?? 0) > 0}
+            interactive
+          />
+        </Link>
       </div>
 
       <div className="card-surface mt-4 rounded-2xl border border-zinc-200 p-5">
-        <div className="text-sm font-semibold text-[#1A1A2E]">Revenue</div>
-        <div className="mt-2 flex items-center justify-between">
+        <div className="flex justify-between">
           <div>
-            <div className="text-sm text-slate-500">This month</div>
+            <div className="text-sm font-semibold text-[#1A1A2E]">Revenue</div>
+            <div className="mt-2 text-sm text-slate-500">This month</div>
             <div className="text-2xl font-semibold text-[#1A1A2E]">{formatAmountINR(thisMonthRevenue)}</div>
+            <div className="mt-1 flex items-center gap-2">
+              <div className={trendUp ? "text-green-700" : "text-red-700"}>{trendUp ? "↗" : "↘"}</div>
+              <div className="text-sm text-slate-500">Last month {formatAmountINR(lastMonthRevenue)}</div>
+            </div>
           </div>
-          <div className={trendUp ? "text-green-700" : "text-red-700"}>{trendUp ? "↗" : "↘"}</div>
+          
+          <div className="w-1/2 xs:w-1/3 h-24 hidden sm:block">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <Tooltip cursor={{ fill: "transparent" }} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                <Bar dataKey="revenue" fill="#1A1A2E" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="mt-1 text-sm text-slate-500">Last month {formatAmountINR(lastMonthRevenue)}</div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -203,9 +110,38 @@ export default async function DashboardHome() {
           <div className="card-surface rounded-2xl border border-zinc-200 p-5">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-[#1A1A2E]">Upcoming renewals (7 days)</div>
-              <Link href="/members" className="text-sm font-medium underline underline-offset-4">
-                View all
-              </Link>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const numbersToMessage = upcomingRows
+                      .map((r: any) => ({
+                         mobile: r.mobile,
+                         msg: encodeURIComponent(reminderMessage({
+                           name: r.full_name,
+                           endDate: formatDateShortIST(r.end_date),
+                           daysLeft: Math.max(0, Math.ceil((new Date(`${r.end_date}T00:00:00+05:30`).getTime() - new Date(`${today}T00:00:00+05:30`).getTime()) / (1000 * 60 * 60 * 24)))
+                         }))
+                      }));
+                    // Bulk reminder opening one by one is tricky to do fully automated due to popup blockers,
+                    // but we can provide instructions or open the first 5 with staggered timeouts (with user warning)
+                    if(numbersToMessage.length > 0) {
+                      if(window.confirm(`This will attempt to open WhatsApp for ${numbersToMessage.length} members. Ensure popups are allowed.`)) {
+                         numbersToMessage.forEach((n: any, idx: number) => {
+                           setTimeout(() => { window.open(`https://wa.me/${n.mobile}?text=${n.msg}`, '_blank'); }, idx * 500);
+                         });
+                      }
+                    } else {
+                      alert("No members are expiring in 7 days.");
+                    }
+                  }}
+                  className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white"
+                >
+                  Bulk Reminder
+                </button>
+                <Link href="/members?filter=expiring" className="text-sm font-medium underline underline-offset-4">
+                  View all
+                </Link>
+              </div>
             </div>
             <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
               <div className="grid grid-cols-12 gap-2 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600">
@@ -215,7 +151,7 @@ export default async function DashboardHome() {
                 <div className="col-span-2 text-right">Action</div>
               </div>
               {upcomingRows.length ? (
-                upcomingRows.map((r) => (
+                upcomingRows.map((r: any) => (
                   <div
                     key={r.membership_id}
                     className="grid grid-cols-12 gap-2 px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-50"
@@ -229,8 +165,9 @@ export default async function DashboardHome() {
                     <div className="col-span-2 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <a
-                          href={whatsappLink(
-                            r.mobile,
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          href={`https://wa.me/${r.mobile}?text=${encodeURIComponent(
                             reminderMessage({
                               name: r.full_name,
                               endDate: formatDateShortIST(r.end_date),
@@ -243,7 +180,7 @@ export default async function DashboardHome() {
                                 )
                               ),
                             })
-                          )}
+                          )}`}
                           className="status-success rounded px-2 py-1 text-xs"
                         >
                           WA
@@ -298,7 +235,7 @@ export default async function DashboardHome() {
                 <div className="col-span-3 text-right">Actions</div>
               </div>
               {recentRows.length ? (
-                recentRows.map((p) => (
+                recentRows.map((p: any) => (
                   <div
                     key={p.id}
                     className="grid grid-cols-12 gap-2 px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-50"
@@ -312,8 +249,9 @@ export default async function DashboardHome() {
                           →
                         </Link>
                         <a
-                          href={whatsappLink(
-                            p.member_mobile,
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          href={`https://wa.me/${p.member_mobile}?text=${encodeURIComponent(
                             receiptMessage({
                               name: p.member_name,
                               receiptNo: p.receipt_number,
@@ -323,7 +261,7 @@ export default async function DashboardHome() {
                               amount: Number(p.amount ?? 0),
                               mode: p.payment_mode.toUpperCase(),
                             })
-                          )}
+                          )}`}
                           className="status-success rounded px-2 py-1 text-xs"
                         >
                           WA
@@ -352,15 +290,17 @@ function StatCard({
   icon,
   tint,
   pulse,
+  interactive,
 }: {
   label: string;
   value: string;
   icon: string;
   tint: string;
   pulse?: boolean;
+  interactive?: boolean;
 }) {
   return (
-    <div className="card-surface rounded-2xl border border-zinc-200 p-4">
+    <div className={`card-surface rounded-2xl border border-zinc-200 p-4 ${interactive ? "hover:border-zinc-300 hover:shadow-sm transition-all" : ""}`}>
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         <span className={`rounded px-2 py-1 text-xs ${tint}`}>{icon}</span>
@@ -371,4 +311,3 @@ function StatCard({
     </div>
   );
 }
-

@@ -35,21 +35,17 @@ export function reminderMessage(params: {
   endDate: string;
   daysLeft: number;
 }): string {
-  if (params.daysLeft <= 0) {
-    return `Hi ${params.name},
+  return `Hello ${params.name} 👋
 
-Your *SM FITNESS* membership has *expired*.
+This is a reminder from *SM FITNESS* 🏋️
 
-Please visit us to renew and continue your fitness journey! 💪
+Your gym membership is expiring on *${params.endDate}*.
 
-– SM FITNESS`;
-  }
-  return `Hi ${params.name},
+Please renew before it expires to continue your fitness journey without interruption 💪
 
-Your *SM FITNESS* membership expires in *${params.daysLeft} day${params.daysLeft > 1 ? "s" : ""}* on ${params.endDate}.
+For renewal, contact us or visit the gym.
 
-Renew now to keep your momentum going! 💪
-
-– SM FITNESS`;
+Thank you!
+— SM FITNESS Team`;
 }
 

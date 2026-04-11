@@ -27,7 +27,7 @@ export async function GET(
 
   if (dbError) return NextResponse.json({ error: dbError.message }, { status: 404 });
 
-  const [{ data: membership }, { data: member }] = await Promise.all([
+  const [{ data: membership }, { data: member }, { data: settings }] = await Promise.all([
     supabaseAdmin
       .from("memberships")
       .select("id, plan_id, start_date, end_date")
@@ -37,6 +37,11 @@ export async function GET(
       .from("members")
       .select("id, full_name, member_code, mobile")
       .eq("id", data.member_id)
+      .single(),
+    supabaseAdmin
+      .from("gym_settings")
+      .select("*")
+      .limit(1)
       .single(),
   ]);
 
@@ -51,6 +56,7 @@ export async function GET(
     member: member ?? null,
     membership: membership ?? null,
     plan: plan ?? null,
+    settings: settings ?? null,
   });
 }
 

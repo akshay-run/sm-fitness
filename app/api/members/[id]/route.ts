@@ -56,6 +56,23 @@ export async function GET(
     .limit(1)
     .maybeSingle();
 
+  const { data: allMemberships } = await supabaseAdmin
+    .from("memberships")
+    .select("id, plan_id, fee_charged, start_date, end_date, status")
+    .eq("member_id", parsedParams.data.id)
+    .order("end_date", { ascending: false });
+
+  const planIds = Array.from(new Set((allMemberships ?? []).map((m: any) => String(m.plan_id))));
+  const { data: plans } = planIds.length
+    ? await supabaseAdmin.from("plans").select("id, name").in("id", planIds)
+    : { data: [] };
+  const planMap = new Map((plans ?? []).map((p: any) => [String(p.id), p.name]));
+
+  const membershipHistory = (allMemberships ?? []).map((m: any) => ({
+    ...m,
+    plan_name: planMap.get(String(m.plan_id)) ?? "Membership",
+  }));
+
   const { data: plan } = latestMembership?.plan_id
     ? await supabaseAdmin
         .from("plans")
@@ -110,6 +127,7 @@ export async function GET(
           days_left: 0,
         },
     recentPayments: recentPayments ?? [],
+    membershipHistory,
   });
 }
 
@@ -141,14 +159,8 @@ export async function PATCH(
     email: parsedBody.data.email === "" ? null : parsedBody.data.email,
     date_of_birth: parsedBody.data.date_of_birth === "" ? null : parsedBody.data.date_of_birth,
     address: parsedBody.data.address === "" ? null : parsedBody.data.address,
-    emergency_contact_name:
-      parsedBody.data.emergency_contact_name === ""
-        ? null
-        : parsedBody.data.emergency_contact_name,
-    emergency_contact_phone:
-      parsedBody.data.emergency_contact_phone === ""
-        ? null
-        : parsedBody.data.emergency_contact_phone,
+    blood_group: parsedBody.data.blood_group === "" ? null : parsedBody.data.blood_group,
+    joining_date: parsedBody.data.joining_date === "" ? null : parsedBody.data.joining_date,
     notes: parsedBody.data.notes === "" ? null : parsedBody.data.notes,
   };
 
