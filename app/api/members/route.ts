@@ -183,12 +183,8 @@ export async function POST(req: Request) {
     date_of_birth: parsed.data.date_of_birth ? parsed.data.date_of_birth : null,
     gender: parsed.data.gender ?? null,
     address: parsed.data.address ? parsed.data.address : null,
-    emergency_contact_name: parsed.data.emergency_contact_name
-      ? parsed.data.emergency_contact_name
-      : null,
-    emergency_contact_phone: parsed.data.emergency_contact_phone
-      ? parsed.data.emergency_contact_phone
-      : null,
+    blood_group: parsed.data.blood_group ? parsed.data.blood_group : null,
+    joining_date: parsed.data.joining_date ? parsed.data.joining_date : null,
     notes: parsed.data.notes ? parsed.data.notes : null,
     is_active: true,
   };

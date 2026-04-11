@@ -122,12 +122,17 @@ export function LoginClient() {
           </div>
 
           <div className="space-y-1">
-            <label
-              className="text-sm font-medium text-zinc-800"
-              htmlFor="password"
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label
+                className="text-sm font-medium text-zinc-800"
+                htmlFor="password"
+              >
+                Password
+              </label>
+              <a href="#" className="text-xs font-medium text-zinc-600 hover:text-zinc-900 underline underline-offset-2" onClick={(e) => { e.preventDefault(); alert("Contact an administrator to reset your password."); }}>
+                Forgot password?
+              </a>
+            </div>
             <input
               id="password"
               type="password"
@@ -149,8 +154,14 @@ export function LoginClient() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-80"
           >
+            {submitting && (
+              <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
             {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
