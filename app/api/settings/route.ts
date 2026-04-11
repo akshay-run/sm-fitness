@@ -5,11 +5,21 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { getGymDisplay } from "@/lib/gymDisplay";
 import { internalServerError } from "@/lib/apiError";
 
+const emptyToNull = (v: unknown) => (v === "" ? null : v);
+
 const patchSchema = z.object({
   gym_name: z.string().trim().min(1).max(200).optional(),
   address: z.string().trim().max(1000).nullable().optional(),
   phone: z.string().trim().max(40).nullable().optional(),
   upi_id: z.string().trim().max(200).nullable().optional(),
+  backup_email: z.preprocess(
+    emptyToNull,
+    z.union([z.null(), z.string().trim().email().max(320)]).optional()
+  ),
+  whatsapp_group_link: z.preprocess(
+    emptyToNull,
+    z.union([z.null(), z.string().trim().url().max(500)]).optional()
+  ),
 });
 
 export async function GET() {
@@ -21,7 +31,9 @@ export async function GET() {
 
   const { data: raw } = await supabaseAdmin
     .from("gym_settings")
-    .select("gym_name, address, phone, upi_id, logo_path, upi_qr_path")
+    .select(
+      "gym_name, address, phone, upi_id, backup_email, whatsapp_group_link, logo_path, upi_qr_path"
+    )
     .eq("id", 1)
     .maybeSingle();
 
@@ -51,6 +63,12 @@ export async function PATCH(req: Request) {
   if (parsed.data.address !== undefined) updates.address = parsed.data.address;
   if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone;
   if (parsed.data.upi_id !== undefined) updates.upi_id = parsed.data.upi_id;
+  if (parsed.data.backup_email !== undefined) {
+    updates.backup_email = parsed.data.backup_email;
+  }
+  if (parsed.data.whatsapp_group_link !== undefined) {
+    updates.whatsapp_group_link = parsed.data.whatsapp_group_link;
+  }
 
   const { error: upError } = await supabaseAdmin
     .from("gym_settings")

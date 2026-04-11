@@ -58,8 +58,8 @@ export async function GET(req: Request) {
 
   const [{ data: members }, { data: memberships }] = await Promise.all([
     memberIds.length
-      ? supabaseAdmin.from("members").select("id, full_name").in("id", memberIds)
-      : { data: [] as { id: string; full_name: string }[] },
+      ? supabaseAdmin.from("members").select("id, full_name, mobile").in("id", memberIds)
+      : { data: [] as { id: string; full_name: string; mobile: string }[] },
     membershipIds.length
       ? supabaseAdmin
           .from("memberships")
@@ -68,7 +68,9 @@ export async function GET(req: Request) {
       : { data: [] as { id: string; plan_id: string }[] },
   ]);
 
-  const memberMap = new Map((members ?? []).map((m) => [String(m.id), m.full_name]));
+  const memberMap = new Map(
+    (members ?? []).map((m) => [String(m.id), { name: m.full_name, mobile: m.mobile ?? "" }])
+  );
   const memShipMap = new Map((memberships ?? []).map((m) => [String(m.id), String(m.plan_id)]));
 
   const planIds = [...new Set((memberships ?? []).map((m) => String(m.plan_id)))];
@@ -86,6 +88,7 @@ export async function GET(req: Request) {
   const paymentList: Array<{
     id: string;
     member_name: string;
+    member_mobile: string;
     payment_date: string;
     plan_name: string;
     amount: number;
@@ -112,9 +115,11 @@ export async function GET(req: Request) {
       planRev.set(pid, cur);
     }
 
+    const mem = memberMap.get(String(p.member_id));
     paymentList.push({
       id: String(p.id),
-      member_name: memberMap.get(String(p.member_id)) ?? "Member",
+      member_name: mem?.name ?? "Member",
+      member_mobile: mem?.mobile ?? "—",
       payment_date: String(p.payment_date),
       plan_name: pname,
       amount: amt,

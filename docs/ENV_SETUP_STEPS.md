@@ -80,7 +80,9 @@ Set:
    ```
 
 2. Set `CRON_SECRET` in `.env.local` to that value.
-3. On Vercel, scheduled crons send `Authorization: Bearer <same value>` automatically. For manual tests, use either that header or `x-cron-secret: <same value>` (no query-string secret).
+3. On Vercel, scheduled crons send `Authorization: Bearer <same value>` automatically. For manual tests, use either that header or `x-cron-secret: <same value>` (no query-string secret) for **`/api/cron/reminders`**. The backup job **`/api/cron/backup`** accepts **only** `Authorization: Bearer <CRON_SECRET>`.
+
+4. Optional: set **`BACKUP_EMAIL`** in `.env.local` (and Vercel) as a fallback if you do not store a backup address under **Settings → Notifications & Backup**.
 
 ---
 
@@ -103,7 +105,7 @@ After your core schema exists, run the extension migration in the Supabase **SQL
 
 - File in repo: [`supabase/migrations/001_sm_fitness_extensions.sql`](../supabase/migrations/001_sm_fitness_extensions.sql)
 
-It adds `gym_settings`, `plans.default_price`, `members.blood_group` / `joining_date`, and removes legacy emergency-contact columns if present. See [`supabase/README.md`](../supabase/README.md) for the full apply order.
+It adds `gym_settings` (with notification fields), `plans.default_price`, `members` columns (`blood_group`, `joining_date`, `welcome_wa_sent`), nullable `email_logs.member_id` for system emails, and removes legacy emergency-contact columns if present. See [`supabase/README.md`](../supabase/README.md) for the full apply order.
 
 ---
 

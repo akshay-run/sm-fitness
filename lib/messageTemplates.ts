@@ -9,6 +9,34 @@ export function smsLink(phone: string, message: string): string {
   return `sms:+91${digits}?body=${encodeURIComponent(message)}`;
 }
 
+export function welcomeMemberWhatsAppMessage(params: {
+  fullName: string;
+  memberCode: string;
+  mobile: string;
+  planName: string;
+  startDate: string;
+  endDate: string;
+  whatsappGroupLink?: string | null;
+}): string {
+  const link = params.whatsappGroupLink?.trim();
+  const groupBlock =
+    link && link.length > 0
+      ? `\nJoin our WhatsApp group for updates:\n${link}\n`
+      : "";
+  return `Hi ${params.fullName}! 👋
+
+Welcome to *SM FITNESS*! 🏋️
+
+Your membership details:
+- Member ID: ${params.memberCode}
+- Mobile on file: ${params.mobile}
+- Plan: ${params.planName}
+- Valid: ${params.startDate} to ${params.endDate}
+${groupBlock}
+See you at the gym! 💪
+– SM FITNESS`;
+}
+
 export function receiptMessage(params: {
   name: string;
   receiptNo: string;

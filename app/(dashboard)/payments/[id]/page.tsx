@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatAmountINR, formatDateShortIST, formatDateTimeIST } from "@/lib/uiFormat";
-import { receiptMessage, smsLink, whatsappLink } from "@/lib/messageTemplates";
+import {
+  receiptMessage,
+  smsLink,
+  welcomeMemberWhatsAppMessage,
+  whatsappLink,
+} from "@/lib/messageTemplates";
 
 type Payment = {
   id: string;
@@ -19,7 +24,13 @@ type Payment = {
   created_at: string;
 };
 
-type Member = { id: string; full_name: string; member_code: string; mobile: string };
+type Member = {
+  id: string;
+  full_name: string;
+  member_code: string;
+  mobile: string;
+  welcome_wa_sent?: boolean;
+};
 type Membership = { id: string; start_date: string; end_date: string };
 type Plan = { name: string };
 
@@ -28,6 +39,7 @@ type GymBranding = {
   address: string | null;
   phone: string | null;
   logo_signed_url: string | null;
+  whatsapp_group_link: string | null;
 };
 
 export default function PaymentDetailPage({
@@ -45,6 +57,7 @@ export default function PaymentDetailPage({
   const [info, setInfo] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [gym, setGym] = useState<GymBranding | null>(null);
+  const [welcomeWaSent, setWelcomeWaSent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +73,9 @@ export default function PaymentDetailPage({
       } else {
         if (!cancelled) {
           setPayment(json.payment);
-          setMember(json.member ?? null);
+          const m = json.member ?? null;
+          setMember(m);
+          setWelcomeWaSent(m?.welcome_wa_sent === true);
           setMembership(json.membership ?? null);
           setPlan(json.plan ?? null);
           setGym(json.gym ?? null);
@@ -104,6 +119,31 @@ export default function PaymentDetailPage({
         mode: payment.payment_mode.toUpperCase(),
       })
     : "";
+
+  const welcomeMessage =
+    member && membership
+      ? welcomeMemberWhatsAppMessage({
+          fullName: member.full_name,
+          memberCode: member.member_code,
+          mobile: member.mobile,
+          planName: planName,
+          startDate: formatDateShortIST(membership.start_date),
+          endDate: formatDateShortIST(membership.end_date),
+          whatsappGroupLink: gym?.whatsapp_group_link ?? null,
+        })
+      : "";
+
+  const showWelcomeWa =
+    Boolean(member && membership && plan) && !welcomeWaSent;
+
+  async function markWelcomeSent(memberId: string) {
+    const res = await fetch(`/api/members/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ welcome_wa_sent: true }),
+    });
+    if (res.ok) setWelcomeWaSent(true);
+  }
   const badgeClass = payment.email_sent ? "status-success" : "status-warning";
   const badgeText = payment.email_sent ? "Receipt email sent ✓" : "Receipt email not sent yet";
 
@@ -175,7 +215,7 @@ export default function PaymentDetailPage({
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 print:hidden">
+      <div className="mt-6 flex flex-wrap items-center gap-2 print:hidden">
         <button
           type="button"
           onClick={() => window.print()}
@@ -183,6 +223,23 @@ export default function PaymentDetailPage({
         >
           Print receipt
         </button>
+        {welcomeWaSent ? (
+          <span className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+            Welcome sent ✓
+          </span>
+        ) : showWelcomeWa && member ? (
+          <a
+            href={whatsappLink(member.mobile, welcomeMessage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              void markWelcomeSent(member.id);
+            }}
+            className="rounded-lg border-2 border-green-600 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+          >
+            💬 Send Welcome
+          </a>
+        ) : null}
         <button
           type="button"
           onClick={async () => {
@@ -208,6 +265,19 @@ export default function PaymentDetailPage({
             <a href={whatsappLink(member.mobile, shareMessage)} className="status-success rounded-lg px-4 py-2 text-sm">
               💬 WhatsApp
             </a>
+            {!welcomeWaSent && showWelcomeWa ? (
+              <a
+                href={whatsappLink(member.mobile, welcomeMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  void markWelcomeSent(member.id);
+                }}
+                className="rounded-lg border-2 border-green-600 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+              >
+                Send Welcome on WhatsApp
+              </a>
+            ) : null}
             <a href={smsLink(member.mobile, shareMessage)} className="status-info rounded-lg px-4 py-2 text-sm">
               📱 SMS
             </a>

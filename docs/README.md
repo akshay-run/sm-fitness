@@ -9,6 +9,8 @@
 | [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) | Pre-release user acceptance testing (features, cron, PWA). |
 | [E2E_TEST_MATRIX.md](./E2E_TEST_MATRIX.md) | Manual E2E-style cases, slow-network checks, automated test log. |
 | [SM_FITNESS_PROJECT_CONTEXT.txt](./SM_FITNESS_PROJECT_CONTEXT.txt) | Original product constraints and scope (reference). |
+| [BACKUP_SYSTEM.md](./BACKUP_SYSTEM.md) | 5-day member backup email cron, schedule, and setup. |
+| [WHATSAPP_FEATURES.md](./WHATSAPP_FEATURES.md) | WhatsApp deep links: welcome, receipt, reminders. |
 
 Internal / historical notes: [issue-list.txt](./issue-list.txt) (may be outdated; use UAT/E2E docs for release).
 

@@ -8,6 +8,8 @@ type SettingsPayload = {
   address: string | null;
   phone: string | null;
   upi_id: string | null;
+  backup_email: string | null;
+  whatsapp_group_link: string | null;
   logo_signed_url: string | null;
   upi_qr_signed_url: string | null;
   logo_path: string | null;
@@ -21,6 +23,8 @@ export function SettingsClient() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [upiId, setUpiId] = useState("");
+  const [backupEmail, setBackupEmail] = useState("");
+  const [whatsappGroupLink, setWhatsappGroupLink] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
@@ -34,6 +38,8 @@ export function SettingsClient() {
       setAddress(json.address ?? "");
       setPhone(json.phone ?? "");
       setUpiId(json.upi_id ?? "");
+      setBackupEmail(json.backup_email ?? "");
+      setWhatsappGroupLink(json.whatsapp_group_link ?? "");
       setLogoUrl(json.logo_signed_url);
       setQrUrl(json.upi_qr_signed_url);
     } catch (e: unknown) {
@@ -59,6 +65,8 @@ export function SettingsClient() {
           address: address.trim() || null,
           phone: phone.trim() || null,
           upi_id: upiId.trim() || null,
+          backup_email: backupEmail.trim() || null,
+          whatsapp_group_link: whatsappGroupLink.trim() || null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -153,6 +161,55 @@ export function SettingsClient() {
             onChange={(e) => setUpiId(e.target.value)}
             placeholder="name@bank"
           />
+        </div>
+
+        <div className="border-t border-zinc-100 pt-6">
+          <h2 className="text-sm font-semibold text-zinc-900">Notifications &amp; Backup</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Backup reports and WhatsApp onboarding use these values.
+          </p>
+          <div className="mt-4 space-y-4">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-zinc-800" htmlFor="backup_email">
+                Backup email address
+              </label>
+              <p className="text-xs text-zinc-500">Member backup report is sent here every 5 days</p>
+              <input
+                id="backup_email"
+                type="email"
+                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                value={backupEmail}
+                onChange={(e) => setBackupEmail(e.target.value)}
+                placeholder="owner.backup@gmail.com"
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-zinc-800" htmlFor="whatsapp_group_link">
+                Gym WhatsApp group link
+              </label>
+              <p className="text-xs text-zinc-500">Shared with new members in welcome message</p>
+              <div className="flex flex-wrap items-stretch gap-2">
+                <input
+                  id="whatsapp_group_link"
+                  type="url"
+                  className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  value={whatsappGroupLink}
+                  onChange={(e) => setWhatsappGroupLink(e.target.value)}
+                  placeholder="https://chat.whatsapp.com/..."
+                />
+                <button
+                  type="button"
+                  title="Opens link to verify it works"
+                  disabled={!whatsappGroupLink.trim()}
+                  onClick={() => window.open(whatsappGroupLink.trim(), "_blank", "noopener,noreferrer")}
+                  className="shrink-0 rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Test
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 border-t border-zinc-100 pt-4 sm:grid-cols-2">

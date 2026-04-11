@@ -67,8 +67,9 @@ Use this checklist before production release.
 - [ ] 7-day / 1-day / expired reminders trigger correctly by IST date.
 - [ ] Duplicate cron sends are prevented per day/type/membership.
 - [ ] Cancelled memberships are never updated to `expired` by cron status update.
-- [ ] `/api/cron/ping` returns healthy response.
-- [ ] Invalid/missing cron secret returns unauthorized.
+- [ ] `/api/cron/backup` runs with `Authorization: Bearer <CRON_SECRET>` and sends HTML email when `backup_email` or `BACKUP_EMAIL` is set; returns `{ skipped: true }` when no recipient.
+- [ ] `/api/cron/backup` rejects wrong or missing Bearer token (401).
+- [ ] Invalid/missing cron secret returns unauthorized on protected cron routes.
 
 ## 9) Dashboard & Reports
 

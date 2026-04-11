@@ -54,7 +54,13 @@ export function formatAmountINR(value: number | string) {
  */
 export function formatAmountPdfINR(value: number | string): string {
   const n = Number(value || 0);
-  return `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 0, minimumFractionDigits: 0 })}`;
+  const s = n.toLocaleString("en-IN", { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+  return `₹${s}`;
+}
+
+/** Title case for display/PDF (ASCII letters). */
+export function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase());
 }
 
 function normalizeDateInput(input: string | Date) {

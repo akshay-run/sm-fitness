@@ -37,8 +37,8 @@ middleware.ts            # Session refresh / route protection (see Next.js docs 
 | Payments | `payments`, `payments/[id]`, `payments/[id]/resend` |
 | Plans | `plans` |
 | Email | `email` |
-| Reports | `reports/revenue`, `reports/members-csv` |
-| Cron | `cron/reminders`, `cron/ping` (protected by `CRON_SECRET` via `Authorization: Bearer` or `x-cron-secret`) |
+| Reports | `reports/revenue`, `reports/members-csv`, `reports/summary` |
+| Cron | `cron/reminders` (Bearer or `x-cron-secret`), `cron/backup` (**Bearer only**) — both require `CRON_SECRET` |
 
 ## Data rules (summary)
 

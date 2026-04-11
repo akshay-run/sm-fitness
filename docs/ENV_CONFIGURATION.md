@@ -55,7 +55,9 @@ Then fill in values below.
 
 | Variable | Description |
 |----------|-------------|
-| `CRON_SECRET` | Shared secret. Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>` when the variable is set. The app also accepts header `x-cron-secret` for manual or legacy callers. |
+| `CRON_SECRET` | Shared secret. Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>` when the variable is set. The app also accepts header `x-cron-secret` for manual or legacy callers on `/api/cron/reminders`. The backup job (`/api/cron/backup`) checks **only** `Authorization: Bearer <CRON_SECRET>`. |
+
+| `BACKUP_EMAIL` | Optional. If `gym_settings.backup_email` is empty, the 5-day **member backup** cron email is sent here instead. Prefer storing the address in **Settings → Notifications & Backup** so it stays in the database. |
 
 **Generate a strong value (example PowerShell):**
 

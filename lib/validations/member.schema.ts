@@ -32,7 +32,11 @@ export const createMemberSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Joining date must be a valid date"),
 });
 
-export const updateMemberSchema = createMemberSchema.partial();
+export const updateMemberSchema = createMemberSchema
+  .partial()
+  .extend({
+    welcome_wa_sent: z.boolean().optional(),
+  });
 
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;

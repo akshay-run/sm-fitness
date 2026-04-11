@@ -36,7 +36,7 @@ export async function GET(
       .single(),
     supabaseAdmin
       .from("members")
-      .select("id, full_name, member_code, mobile")
+      .select("id, full_name, member_code, mobile, welcome_wa_sent")
       .eq("id", data.member_id)
       .single(),
   ]);

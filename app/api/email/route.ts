@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { hasSentEmail, sendAndLog, type EmailType } from "@/lib/email";
 
+// Member-scoped sends only. System "backup" digest is sent from /api/cron/backup (logged with type backup).
 const schema = z.object({
   member_id: z.string().uuid(),
   type: z.enum(["welcome", "receipt", "reminder_7d", "reminder_1d", "expired"]),

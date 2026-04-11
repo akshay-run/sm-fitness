@@ -12,7 +12,7 @@ Run the full contents of:
 
 **[`migrations/001_sm_fitness_extensions.sql`](./migrations/001_sm_fitness_extensions.sql)**
 
-This adds `gym_settings`, `plans.default_price`, `members.blood_group` / `joining_date`, and drops legacy emergency-contact columns if present.
+This adds `gym_settings` (including `backup_email`, `whatsapp_group_link`), `plans.default_price`, `members.blood_group` / `joining_date` / `welcome_wa_sent`, makes `email_logs.member_id` nullable for system emails, and drops legacy emergency-contact columns if present.
 
 ## 3. Admin user row
 

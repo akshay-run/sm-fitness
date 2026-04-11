@@ -5,6 +5,8 @@ export type GymDisplay = {
   address: string | null;
   phone: string | null;
   upi_id: string | null;
+  backup_email: string | null;
+  whatsapp_group_link: string | null;
   logo_signed_url: string | null;
   upi_qr_signed_url: string | null;
 };
@@ -21,7 +23,9 @@ export async function getGymDisplay(
 
   const { data, error } = await supabaseAdmin
     .from("gym_settings")
-    .select("gym_name, address, phone, upi_id, logo_path, upi_qr_path")
+    .select(
+      "gym_name, address, phone, upi_id, backup_email, whatsapp_group_link, logo_path, upi_qr_path"
+    )
     .eq("id", 1)
     .maybeSingle();
 
@@ -31,6 +35,8 @@ export async function getGymDisplay(
       address: null,
       phone: null,
       upi_id: null,
+      backup_email: null,
+      whatsapp_group_link: null,
       logo_signed_url: null,
       upi_qr_signed_url: null,
     };
@@ -56,6 +62,10 @@ export async function getGymDisplay(
     address: data.address,
     phone: data.phone,
     upi_id: data.upi_id,
+    backup_email: data.backup_email ? String(data.backup_email).trim() || null : null,
+    whatsapp_group_link: data.whatsapp_group_link
+      ? String(data.whatsapp_group_link).trim() || null
+      : null,
     logo_signed_url,
     upi_qr_signed_url,
   };

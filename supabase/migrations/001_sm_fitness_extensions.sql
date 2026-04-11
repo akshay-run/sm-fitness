@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS public.gym_settings (
 INSERT INTO public.gym_settings (id) VALUES (1)
 ON CONFLICT (id) DO NOTHING;
 
+ALTER TABLE public.gym_settings ADD COLUMN IF NOT EXISTS backup_email TEXT;
+ALTER TABLE public.gym_settings ADD COLUMN IF NOT EXISTS whatsapp_group_link TEXT;
+
+ALTER TABLE public.members ADD COLUMN IF NOT EXISTS welcome_wa_sent BOOLEAN DEFAULT false;
+
+-- System emails (e.g. cron backup) are not tied to one member
+ALTER TABLE public.email_logs ALTER COLUMN member_id DROP NOT NULL;
+
 -- Plans: default price hint for UI
 ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS default_price numeric(12, 2);
 

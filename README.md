@@ -7,6 +7,8 @@ Admin-only gym management PWA: members, memberships, payments (cash + UPI QR), e
 | Resource | Description |
 |----------|-------------|
 | [docs/README.md](docs/README.md) | Index of all project docs. |
+| [docs/BACKUP_SYSTEM.md](docs/BACKUP_SYSTEM.md) | Member backup email cron. |
+| [docs/WHATSAPP_FEATURES.md](docs/WHATSAPP_FEATURES.md) | WhatsApp deep-link features. |
 | [docs/ENV_SETUP_STEPS.md](docs/ENV_SETUP_STEPS.md) | **Start here for `.env`:** step-by-step from install to Vercel. |
 | [docs/ENV_CONFIGURATION.md](docs/ENV_CONFIGURATION.md) | Full `.env` variable reference, security, troubleshooting. |
 | [docs/ENV_SETUP_CHECKLIST.md](docs/ENV_SETUP_CHECKLIST.md) | Quick env checklist before first run. |
@@ -20,11 +22,13 @@ Admin-only gym management PWA: members, memberships, payments (cash + UPI QR), e
 - **Members:** Create, edit, soft deactivate; auto member code; photo upload or webcam (compressed).
 - **Memberships:** Plans (monthly/quarterly/half-yearly/annual), custom fee, IST dates, renewal rules.
 - **Payments:** Cash or UPI (QR + manual confirm), one payment per membership, receipt numbering, HTML email receipt.
-- **Email:** Welcome, receipt, expiry reminders (cron); duplicate prevention and logs; resend.
+- **Email:** Welcome, receipt, expiry reminders (cron); duplicate prevention and logs; resend; periodic **member backup** HTML email (cron).
 - **Dashboard:** Stats, revenue (this month vs last), upcoming renewals, recent payments.
-- **Reports:** CSV export, monthly revenue summary.
+- **Reports:** CSV export, monthly revenue summary, PDF export with plan breakdown.
 - **Access:** Supabase Auth with an explicit `admins` table check (no privilege escalation via login alone).
-- **Cron:** Reminders and keep-alive ping; authenticate with `x-cron-secret` header only.
+- **Cron:** Reminders and **5-day member backup** email (queries Supabase as keep-alive); authenticate with `CRON_SECRET` (see Cron section).
+- **Settings:** Optional **backup email** and **WhatsApp group link** (welcome message + test link).
+- **WhatsApp (deep links):** One-time **Send Welcome** on the payment receipt screen after payment (wa.me).
 - **PWA:** Manifest and install-friendly baseline.
 
 ## Tech stack
@@ -77,6 +81,7 @@ NEXT_PUBLIC_UPI_ID=
 NEXT_PUBLIC_GYM_NAME=SM FITNESS
 
 CRON_SECRET=
+BACKUP_EMAIL=
 SUPABASE_MEMBER_PHOTO_BUCKET=sm-fitness-member-photo
 ```
 
@@ -110,11 +115,28 @@ Before full flows work:
 
 ## Cron
 
-Configured in `vercel.json` (reminders, ping). Call with header:
+Configured in [`vercel.json`](vercel.json):
+
+| Job | Path | Schedule (UTC) |
+|-----|------|------------------|
+| Reminders | `/api/cron/reminders` | `30 2 * * *` |
+| Member backup email | `/api/cron/backup` | `0 3 */5 * *` (days 1, 6, 11, … of each month at 03:00 UTC; ≈ 08:30 IST) |
+
+**Reminders** (`/api/cron/reminders`): send either header:
+
+```http
+Authorization: Bearer <CRON_SECRET>
+```
+
+or:
 
 ```http
 x-cron-secret: <CRON_SECRET>
 ```
+
+**Backup** (`/api/cron/backup`): requires `Authorization: Bearer <CRON_SECRET>` only.
+
+Recipient for backup: `gym_settings.backup_email` in the database, or env `BACKUP_EMAIL` if unset. See [docs/BACKUP_SYSTEM.md](docs/BACKUP_SYSTEM.md).
 
 Query-string secrets are not supported (avoid leakage in logs and URLs).
 

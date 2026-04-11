@@ -176,6 +176,7 @@ export async function PATCH(
   if (src.blood_group !== undefined) patch.blood_group = src.blood_group ?? null;
   if (src.notes !== undefined) patch.notes = src.notes === "" ? null : src.notes;
   if (src.joining_date !== undefined) patch.joining_date = src.joining_date === "" ? null : src.joining_date;
+  if (src.welcome_wa_sent !== undefined) patch.welcome_wa_sent = src.welcome_wa_sent;
 
   const { data, error: dbError } = await supabaseAdmin
     .from("members")

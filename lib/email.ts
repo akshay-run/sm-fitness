@@ -1,7 +1,35 @@
 import { sendMail } from "@/lib/mailer";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type EmailType = "welcome" | "receipt" | "reminder_7d" | "reminder_1d" | "expired";
+export type EmailType =
+  | "welcome"
+  | "receipt"
+  | "reminder_7d"
+  | "reminder_1d"
+  | "expired"
+  | "backup";
+
+/** System-wide email log row (no single member). Requires `email_logs.member_id` nullable in DB. */
+export async function logBackupEmail({
+  supabaseAdmin,
+  sent_to,
+  status,
+  error_msg,
+}: {
+  supabaseAdmin: SupabaseClient;
+  sent_to: string;
+  status: "sent" | "failed";
+  error_msg?: string | null;
+}) {
+  await supabaseAdmin.from("email_logs").insert({
+    member_id: null,
+    type: "backup",
+    sent_to,
+    status,
+    error_msg: error_msg ?? null,
+    membership_id: null,
+  });
+}
 
 export async function logEmail({
   supabaseAdmin,

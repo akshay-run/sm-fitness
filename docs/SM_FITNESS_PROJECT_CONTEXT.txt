@@ -36,7 +36,7 @@ Date Handling       date-fns + date-fns-tz  Free, handles IST timezone
 Deployment          Vercel                  Free forever for this scale
 
 SKIPPED / NOT USED:
-- WhatsApp / SMS notifications (no reliable free option)
+- Paid WhatsApp Business API (not used; admin app uses free wa.me deep links for WhatsApp; SMS uses sms: links)
 - PDF receipts (replaced by styled HTML email)
 - Facial recognition for attendance (attendance feature removed)
 - Payment gateway / Razorpay (UPI QR only, manual confirmation)
@@ -103,7 +103,7 @@ E. EMAIL NOTIFICATIONS (Nodemailer + Gmail SMTP)
    1 day before expiry     Urgent reminder     Sent by daily cron at 8AM IST
    Day of expiry           Expired notice      Sent by daily cron at 8AM IST
 
-   - All emails logged in email_logs table to prevent duplicates
+   - All emails logged in email_logs table to prevent duplicates (types include welcome, receipt, reminders, expired, and system **backup** digest)
    - If email fails: logged as status=failed, admin can retry via "Resend Email" button
    - Starting config: developer's Gmail for testing
    - Production: replace with gym owner's Gmail SMTP credentials in env vars
@@ -141,9 +141,10 @@ I. CRON JOBS (Vercel Cron — runs at 8AM IST daily)
      → Query memberships expired today      → send expired email (if not sent)
      → Check email_logs for duplicates before sending
    
-   Job 2: /api/cron/ping
-     → SELECT 1 from Supabase every 3 days
-     → Prevents Supabase free project from pausing after 7 days inactivity
+   Job 2: /api/cron/backup
+     → Loads all members / memberships / payments (keep-alive query) every ~5 days (see vercel.json)
+     → Sends HTML **member backup** email to gym_settings.backup_email or BACKUP_EMAIL env
+     → Auth: Authorization: Bearer CRON_SECRET (only)
 
 J. PRINT RECEIPT (FALLBACK)
    - "Print Receipt" button on payment confirmation screen
@@ -187,6 +188,7 @@ TABLE: members
   photo_url                 TEXT                      -- Supabase Storage URL
   is_active                 BOOLEAN DEFAULT true
   notes                     TEXT
+  welcome_wa_sent           BOOLEAN DEFAULT false   -- set true after one-time welcome WhatsApp from receipt UI
   created_at                TIMESTAMPTZ DEFAULT now()
   updated_at                TIMESTAMPTZ DEFAULT now()
 
@@ -231,8 +233,8 @@ TABLE: receipt_counter
 
 TABLE: email_logs
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid()
-  member_id   UUID NOT NULL REFERENCES members(id)
-  type        TEXT NOT NULL    -- welcome / receipt / reminder_7d / reminder_1d / expired
+  member_id   UUID REFERENCES members(id)   -- NULL allowed for system emails (e.g. type=backup)
+  type        TEXT NOT NULL    -- welcome / receipt / reminder_7d / reminder_1d / expired / backup
   sent_to     TEXT NOT NULL    -- email address at time of sending
   status      TEXT NOT NULL    -- sent / failed
   error_msg   TEXT             -- error message if failed
@@ -245,6 +247,11 @@ TABLE: admins
   email       TEXT NOT NULL
   role        TEXT DEFAULT 'owner'  -- owner / staff (staff for future use)
   created_at  TIMESTAMPTZ DEFAULT now()
+
+TABLE: gym_settings (single row id=1)
+  gym_name, address, phone, upi_id, logo_path, upi_qr_path
+  backup_email          TEXT    -- optional; recipient for cron backup digest
+  whatsapp_group_link   TEXT    -- optional; included in welcome WhatsApp template
 
 SUPABASE STORAGE:
   Bucket name: member-photos
@@ -299,8 +306,8 @@ sm-fitness/
 │       └── cron/
 │           ├── reminders/
 │           │   └── route.ts        ← Daily expiry reminder job
-│           └── ping/
-│               └── route.ts        ← Supabase keep-alive ping
+│           └── backup/
+│               └── route.ts        ← Member backup email + DB keep-alive query
 ├── components/
 │   ├── members/
 │   │   ├── MemberForm.tsx          ← Add/edit form with Zod validation
@@ -363,6 +370,7 @@ NEXT_PUBLIC_UPI_ID=PLACEHOLDER@upi  ← Replace with owner's UPI ID
 NEXT_PUBLIC_GYM_NAME=SM FITNESS
 
 CRON_SECRET=                        ← Random string, verify in cron routes
+BACKUP_EMAIL=                       ← Optional fallback if gym_settings.backup_email empty
 
 
 --------------------------------------------------------
@@ -375,8 +383,8 @@ CRON_SECRET=                        ← Random string, verify in cron routes
       "schedule": "30 2 * * *"      ← 8:00 AM IST = 2:30 AM UTC
     },
     {
-      "path": "/api/cron/ping",
-      "schedule": "0 6 */3 * *"     ← Every 3 days at 6AM UTC
+      "path": "/api/cron/backup",
+      "schedule": "0 3 */5 * *"     ← ~every 5 days of month, 3AM UTC (~8:30 IST)
     }
   ]
 }
@@ -512,7 +520,7 @@ STEP 7: EMAIL SETUP
 STEP 8: CRON JOBS
   - /api/cron/reminders route (with CRON_SECRET verification)
   - Daily reminder logic (7d, 1d, expired) with duplicate prevention
-  - /api/cron/ping route (Supabase keep-alive)
+  - /api/cron/backup route (member snapshot HTML email; Bearer CRON_SECRET only)
   - vercel.json cron schedule config
 
 STEP 9: DASHBOARD
@@ -543,9 +551,9 @@ STEP 12: PWA
 Constraint                          Impact / Mitigation
 ---------------------------------   ------------------------------------------
 Gmail SMTP 500 emails/day           Fine for gym <300 members
-Supabase free pauses in 7 days      Solved by /api/cron/ping every 3 days
+Supabase free pauses in 7 days      Mitigated by regular traffic; backup cron queries all members ~5x/month
 Supabase free: no auto backup       Manual CSV export monthly, reminder in UI
-Vercel Cron: 2 jobs/day free        Both jobs fit (reminders + ping)
+Vercel Cron: 2 jobs free tier       Reminders (daily) + backup (~6x/month on day 1,6,11,…)
 No payment auto-confirmation        Admin manually confirms UPI — by design
 Supabase Storage 1GB free           ~6,000 compressed photos — enough for years
 face-api.js 6MB model files         Load lazily on photo screen only
