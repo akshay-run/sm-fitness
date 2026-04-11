@@ -5,7 +5,10 @@ import { z } from "zod";
 
 const schema = z.object({
   plan_id: z.string().uuid("Select a plan"),
-  fee_charged: z.coerce.number().positive("Enter a valid fee"),
+  fee_charged: z.coerce
+    .number()
+    .positive("Enter a valid fee")
+    .max(99_999, "Fee must be at most 99999"),
 });
 
 type Plan = { id: string; name: string; duration_months: number; default_price?: number | null };

@@ -80,7 +80,7 @@ Set:
    ```
 
 2. Set `CRON_SECRET` in `.env.local` to that value.
-3. Call cron routes only with header `x-cron-secret: <same value>` (no query-string secret).
+3. On Vercel, scheduled crons send `Authorization: Bearer <same value>` automatically. For manual tests, use either that header or `x-cron-secret: <same value>` (no query-string secret).
 
 ---
 

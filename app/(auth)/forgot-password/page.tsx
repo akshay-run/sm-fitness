@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 
+function appOrigin(): string {
+  const env = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim().replace(/\/$/, "");
+  if (env) return env;
+  return typeof window !== "undefined" ? window.location.origin : "";
+}
+
 export default function ForgotPasswordPage() {
   const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
@@ -17,9 +23,12 @@ export default function ForgotPasswordPage() {
     setStatus(null);
     setLoading(true);
     try {
-      const origin = window.location.origin;
+      const origin = appOrigin();
+      if (!origin) {
+        throw new Error("App URL is not configured. Set NEXT_PUBLIC_APP_URL.");
+      }
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/update-password")}`,
+        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`,
       });
       if (err) throw err;
       setStatus("Check your email for a reset link.");

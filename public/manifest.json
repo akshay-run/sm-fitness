@@ -1,12 +1,12 @@
 {
-  "name": "SM FITNESS Gym Management",
+  "name": "SM FITNESS",
   "short_name": "SM FITNESS",
   "description": "Admin-only gym management system for members, memberships, payments, and reminders.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#18181b",
+  "background_color": "#ffffff",
+  "theme_color": "#1A1A2E",
   "orientation": "portrait",
   "icons": [
     {

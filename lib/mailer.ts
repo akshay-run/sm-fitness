@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
 function getMailEnv() {
   const user = process.env.GMAIL_USER;
@@ -11,12 +12,21 @@ function getMailEnv() {
   return { user, pass };
 }
 
+let cachedTransporter: Transporter | null = null;
+
+function getTransporter(): Transporter {
+  if (!cachedTransporter) {
+    const { user, pass } = getMailEnv();
+    cachedTransporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass },
+    });
+  }
+  return cachedTransporter;
+}
+
 export function createTransporter() {
-  const { user, pass } = getMailEnv();
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
+  return getTransporter();
 }
 
 export async function sendMail({
@@ -29,7 +39,7 @@ export async function sendMail({
   html: string;
 }) {
   const { user } = getMailEnv();
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   return await transporter.sendMail({
     from: `"SM FITNESS" <${user}>`,
     to,
@@ -37,4 +47,3 @@ export async function sendMail({
     html,
   });
 }
-

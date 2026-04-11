@@ -40,7 +40,7 @@ export function renderReceiptEmail({
           <div style="padding:14px;">
             ${row("Plan", planName)}
             ${row("Membership valid", `${startDate} → ${endDate}`)}
-            ${row("Amount paid", `₹${amount}`)}
+            ${row("Amount paid", amount)}
             ${row("Payment mode", paymentMode.toUpperCase())}
             ${upiRef ? row("UPI Ref", upiRef) : ""}
           </div>

@@ -7,7 +7,7 @@ import { getNextReceiptNumber } from "@/lib/receiptNumber";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
 import { internalServerError } from "@/lib/apiError";
-import { formatDateShortIST } from "@/lib/uiFormat";
+import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -139,7 +139,7 @@ export async function POST(req: Request) {
         .single();
 
       const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
-      const amountLabel = Number(membership.fee_charged ?? 0).toLocaleString("en-IN");
+      const amountLabel = formatAmountINR(Number(membership.fee_charged ?? 0));
       const html = renderReceiptEmail({
         gymName,
         memberName: member.full_name,

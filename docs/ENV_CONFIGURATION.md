@@ -49,12 +49,13 @@ Then fill in values below.
 |----------|-------------|
 | `NEXT_PUBLIC_UPI_ID` | UPI VPA shown in the QR flow (e.g. `9876543210@upi`). |
 | `NEXT_PUBLIC_GYM_NAME` | Display name (default in code: `SM FITNESS`). |
+| `NEXT_PUBLIC_APP_URL` | Public site origin for password reset links and redirects (no trailing slash), e.g. `https://your-app.vercel.app`. Required in production so reset emails do not use the wrong host. |
 
 ### Cron jobs (required for scheduled endpoints)
 
 | Variable | Description |
 |----------|-------------|
-| `CRON_SECRET` | Shared secret; Vercel Cron (or any caller) must send it as header `x-cron-secret`. Query-string secrets are not supported. |
+| `CRON_SECRET` | Shared secret. Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>` when the variable is set. The app also accepts header `x-cron-secret` for manual or legacy callers. |
 
 **Generate a strong value (example PowerShell):**
 
@@ -92,6 +93,7 @@ GMAIL_APP_PASSWORD=
 
 NEXT_PUBLIC_UPI_ID=
 NEXT_PUBLIC_GYM_NAME=SM FITNESS
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 CRON_SECRET=
 
@@ -130,5 +132,6 @@ See [README.md](../README.md) (Supabase prerequisites and DB safeguards) and [`U
 | `Bucket not found` on photo upload | Bucket name mismatch; set `SUPABASE_MEMBER_PHOTO_BUCKET` or create the default bucket. |
 | `Bucket not found` on Settings logo/QR | Create `gym-assets` or set `SUPABASE_GYM_ASSETS_BUCKET` to your bucket name. |
 | `Invalid src prop` for member photo | `NEXT_PUBLIC_SUPABASE_URL` missing or wrong in build; image host comes from this URL. |
-| Cron returns 401 | Missing or wrong `x-cron-secret` header, or `CRON_SECRET` not set on the server. |
+| Cron returns 401 | Wrong or missing `Authorization: Bearer` / `x-cron-secret`, or `CRON_SECRET` not set on the server. |
+| Password reset opens wrong host | Set `NEXT_PUBLIC_APP_URL` and Supabase Auth redirect URLs to your production domain. |
 | Emails not sending | Wrong `GMAIL_USER` / app password, or Gmail blocking sign-in. |

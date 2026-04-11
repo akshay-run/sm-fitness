@@ -73,8 +73,8 @@ async function handleType({
       type === "expired"
         ? `Your ${gymName} membership has expired — Renew now`
         : type === "reminder_1d"
-          ? `⚠️ Your ${gymName} membership expires in 1 day`
-          : `⚠️ Your ${gymName} membership expires in 7 days`;
+          ? `⚠️ Your membership expires in 1 day — ${gymName}`
+          : `⚠️ Your membership expires in 7 days — ${gymName}`;
 
     const sent = await sendAndLog({
       supabaseAdmin,

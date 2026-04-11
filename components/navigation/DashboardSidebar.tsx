@@ -69,6 +69,7 @@ export function DashboardSidebar({ children }: Props) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className={itemClass(isActive, collapsed)}
                 title={collapsed ? item.label : undefined}
                 aria-current={isActive ? "page" : undefined}
@@ -137,6 +138,7 @@ export function DashboardSidebar({ children }: Props) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     className={itemClass(isActive, false)}
                     onClick={() => setMobileOpen(false)}
                     aria-current={isActive ? "page" : undefined}
@@ -180,6 +182,7 @@ export function DashboardSidebar({ children }: Props) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className={[
                   "flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-[11px]",
                   isActive ? "text-[#1A1A2E] font-semibold" : "text-slate-500",

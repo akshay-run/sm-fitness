@@ -20,6 +20,7 @@ Use this as a quick pre-flight list. For a **numbered walkthrough** (install →
 | `GMAIL_APP_PASSWORD` | [ ] |
 | `NEXT_PUBLIC_UPI_ID` | [ ] |
 | `NEXT_PUBLIC_GYM_NAME` | [ ] |
+| `NEXT_PUBLIC_APP_URL` (production origin, no trailing slash; e.g. `https://your-app.vercel.app`) | [ ] |
 | `CRON_SECRET` | [ ] |
 | `SUPABASE_MEMBER_PHOTO_BUCKET` (optional; default `sm-fitness-member-photo`) | [ ] |
 | `SUPABASE_GYM_ASSETS_BUCKET` (optional; default `gym-assets`) | [ ] |
