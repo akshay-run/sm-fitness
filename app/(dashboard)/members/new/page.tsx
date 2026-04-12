@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MemberForm } from "@/components/members/MemberForm";
+import { FlowSteps } from "@/components/ui/FlowSteps";
 import type { CreateMemberInput } from "@/lib/validations/member.schema";
 
 export default function NewMemberPage() {
@@ -31,6 +32,11 @@ export default function NewMemberPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           New Member
         </h1>
+        <FlowSteps
+          steps={["Add member", "Start membership", "Record payment"]}
+          shortLabels={["Member", "Membership", "Payment"]}
+          currentStep={1}
+        />
         <p className="mt-1 text-sm text-zinc-600">
           Mobile and email are required. Other fields are optional.
         </p>

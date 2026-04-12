@@ -53,7 +53,7 @@ export function UPIQRModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+            className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-zinc-200 px-3 py-2 text-xs hover:bg-zinc-50"
           >
             Close
           </button>

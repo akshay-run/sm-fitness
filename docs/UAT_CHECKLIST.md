@@ -22,11 +22,12 @@ Use this checklist before production release.
 ## 3) Members
 
 - [ ] Create member with required fields works.
-- [ ] Member mobile/email validation works.
+- [ ] Member mobile field accepts display mask; submit sends 10 digits; inline validation messages appear per field.
 - [ ] Member code generated correctly and uniquely.
 - [ ] Edit member updates expected fields.
 - [ ] Soft deactivate sets `is_active=false` (no hard delete).
-- [ ] Member list search/filter/pagination works.
+- [ ] Member list search (icon, placeholder) and tabs (including Archived restore dialog) work; pagination works.
+- [ ] Member profile shows Personal / Membership / Payments sections; next-step banners (membership / payment) when applicable; primary actions (Add payment / Start membership) make sense for state.
 
 ## 4) Photo System
 
@@ -38,7 +39,8 @@ Use this checklist before production release.
 
 ## 5) Memberships
 
-- [ ] Create membership with plan + fee works.
+- [ ] New membership page shows step indicator (step 2) when opened with `memberId`; after save, redirects to payments with `flow=new_member`.
+- [ ] Create membership with plan + fee works; inline field errors and optional high-fee warning (> ₹50k) appear as expected.
 - [ ] Renewal logic is correct for active membership.
 - [ ] New membership start date defaults to today IST when no active membership.
 - [ ] End date follows selected plan duration.
@@ -46,6 +48,7 @@ Use this checklist before production release.
 
 ## 6) Payments
 
+- [ ] With `flow=new_member`, payments page shows step 3 indicator; payment form shows inline errors and UPI setup hint when UPI is not configured.
 - [ ] Cash payment flow works.
 - [ ] UPI flow with QR works.
 - [ ] One-payment-per-membership rule enforced.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
+import { useEffect, useMemo, useOptimistic, useState, startTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -260,7 +260,7 @@ export default function MemberProfilePage({
 
   const addPaymentHref =
     membershipHistory.length > 0
-      ? `/payments?membershipId=${membershipHistory[0]!.id}`
+      ? `/payments?membershipId=${membershipHistory[0]!.id}&flow=new_member`
       : null;
   const unpaidHeuristic = recentPayments.length === 0;
   const addPaymentPrimary = Boolean(addPaymentHref && unpaidHeuristic);
@@ -268,9 +268,10 @@ export default function MemberProfilePage({
     (!membership || membership.status === "none" || membership.status === "expired") &&
     !addPaymentPrimary;
 
-  const primaryBtn = "rounded-lg bg-[#1A1A2E] px-3 py-2 text-sm font-medium text-white hover:opacity-95";
+  const primaryBtn =
+    "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1A1A2E] px-3 py-2 text-sm font-medium text-white hover:opacity-95";
   const secondaryBtn =
-    "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50";
+    "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50";
 
   const endFormatted = membership?.end_date ? formatDateShortIST(membership.end_date) : "";
   const reminder = (() => {
@@ -390,20 +391,45 @@ export default function MemberProfilePage({
         <MembershipBanner membership={membership} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      {membership?.status === "none" ? (
+        <Link
+          href={`/memberships/new?memberId=${member.id}`}
+          className="mt-4 block rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-900 hover:bg-teal-100/80"
+        >
+          Next: Start a membership for this member →
+        </Link>
+      ) : membershipHistory.length > 0 && recentPayments.length === 0 ? (
+        <Link
+          href={`/payments?membershipId=${membershipHistory[0]!.id}&flow=new_member`}
+          className="mt-4 block rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 hover:bg-amber-100/80"
+        >
+          Next: Record the payment →
+        </Link>
+      ) : null}
+
+      <SectionHeader label="Personal">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+      </SectionHeader>
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <Card label="Mobile" value={member.mobile} />
         {member.email?.trim() ? (
           <Card label="Email" value={member.email} />
         ) : (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
             <div className="text-xs font-medium text-zinc-600">Email</div>
             <div className="mt-2">
-              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+              <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
                 No email on file
               </span>
             </div>
           </div>
         )}
+      </div>
+
+      <SectionHeader label="Membership">
+        <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" />
+      </SectionHeader>
+      <div className="mt-3 grid grid-cols-2 gap-3">
         <Card label="Plan" value={membership?.plan_name ?? "—"} />
         <Card
           label="Fee paid"
@@ -424,13 +450,13 @@ export default function MemberProfilePage({
       <div className="mt-4 grid grid-cols-2 gap-2">
         <a
           href={whatsappLink(member.mobile, reminder)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm text-zinc-900 hover:bg-zinc-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm text-zinc-900 hover:bg-zinc-50"
         >
           📱 WhatsApp
         </a>
         <a
           href={smsLink(member.mobile, reminder)}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm text-zinc-900 hover:bg-zinc-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm text-zinc-900 hover:bg-zinc-50"
         >
           💬 SMS
         </a>
@@ -442,7 +468,7 @@ export default function MemberProfilePage({
             onClick={() => {
               void markWelcomeSent(member.id);
             }}
-            className="col-span-2 flex items-center justify-center gap-2 rounded-lg border-2 border-green-600 bg-white px-3 py-2 text-center text-sm font-medium text-green-800 hover:bg-green-50"
+            className="col-span-2 flex min-h-[44px] items-center justify-center gap-2 rounded-lg border-2 border-green-600 bg-white px-3 py-2 text-center text-sm font-medium text-green-800 hover:bg-green-50"
           >
             <WhatsAppGlyph className="h-4 w-4 shrink-0" />
             Welcome them 👋
@@ -450,7 +476,7 @@ export default function MemberProfilePage({
         ) : null}
         <button
           type="button"
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
           onClick={async () => {
             if (!member.email?.trim()) {
               setError("Member has no email address.");
@@ -483,7 +509,7 @@ export default function MemberProfilePage({
         </button>
         <Link
           href={`/memberships/new?memberId=${member.id}`}
-          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
         >
           🔄 Renew
         </Link>
@@ -502,14 +528,14 @@ export default function MemberProfilePage({
         <Card label="Notes" value={member.notes ?? "—"} />
       </div>
 
-      <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4">
+      <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="mb-2 text-sm font-semibold text-[#1A1A2E]">Membership history</div>
         {membershipHistory.length ? (
           <div className="space-y-2">
             {membershipHistory.map((h) => (
               <div
                 key={h.id}
-                className="grid grid-cols-1 gap-1 rounded-lg border border-zinc-200 px-3 py-2 text-xs sm:grid-cols-2"
+                className="grid grid-cols-1 gap-1 rounded-md border border-zinc-200 px-4 py-3 text-xs sm:grid-cols-2"
               >
                 <div className="font-medium text-zinc-900">{h.plan_name}</div>
                 <div className="text-zinc-600">
@@ -525,14 +551,17 @@ export default function MemberProfilePage({
         )}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
+      <SectionHeader label="Payments">
+        <path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z" />
+      </SectionHeader>
+      <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="mb-2 text-sm font-semibold text-[#1A1A2E]">Recent payments</div>
         {recentPayments.length ? (
           <div className="space-y-2">
             {recentPayments.map((p) => (
               <div
                 key={p.id}
-                className="grid grid-cols-4 gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-xs"
+                className="grid grid-cols-4 gap-2 rounded-md border border-zinc-200 px-4 py-3 text-xs"
               >
                 <div>{p.receipt_number}</div>
                 <div>{formatAmountINR(p.amount)}</div>
@@ -575,29 +604,41 @@ export default function MemberProfilePage({
   );
 }
 
+function SectionHeader({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-5 mb-0 flex items-center gap-2">
+      <svg className="h-4 w-4 shrink-0 text-zinc-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        {children}
+      </svg>
+      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{label}</span>
+      <div className="h-px flex-1 bg-zinc-200" />
+    </div>
+  );
+}
+
 function MembershipBanner({ membership }: { membership: MembershipSummary | null }) {
   if (!membership || membership.status === "none") {
     return (
-      <div className="status-neutral rounded-xl px-4 py-3 text-sm">No membership assigned yet</div>
+      <div className="status-neutral rounded-lg px-4 py-3 text-sm">No membership assigned yet</div>
     );
   }
   if (membership.status === "expired") {
     return (
-      <div className="status-danger rounded-xl px-4 py-3 text-sm">
+      <div className="status-danger rounded-lg px-4 py-3 text-sm">
         Expired on {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} - Please renew
       </div>
     );
   }
   if (membership.status === "expiring") {
     return (
-      <div className="status-warning rounded-xl px-4 py-3 text-sm">
+      <div className="status-warning rounded-lg px-4 py-3 text-sm">
         ⚠ Expires in {membership.days_left} days -{" "}
         {membership.end_date ? formatDateShortIST(membership.end_date) : "-"}
       </div>
     );
   }
   return (
-    <div className="status-success rounded-xl px-4 py-3 text-sm">
+    <div className="status-success rounded-lg px-4 py-3 text-sm">
       Active until {membership.end_date ? formatDateShortIST(membership.end_date) : "-"} (
       {membership.days_left} days left)
     </div>
@@ -606,7 +647,7 @@ function MembershipBanner({ membership }: { membership: MembershipSummary | null
 
 function Card({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5">
       <div className="text-xs font-medium text-zinc-600">{label}</div>
       <div className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{value}</div>
     </div>

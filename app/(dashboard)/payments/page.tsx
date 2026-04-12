@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PaymentForm } from "@/components/payments/PaymentForm";
+import { FlowSteps } from "@/components/ui/FlowSteps";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 
 const PAGE_SIZE = 25;
@@ -32,6 +33,7 @@ export default function PaymentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const membershipId = searchParams.get("membershipId") || "";
+  const flowNewMember = searchParams.get("flow") === "new_member";
 
   const [items, setItems] = useState<PaymentListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -121,6 +123,13 @@ export default function PaymentsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Payments
           </h1>
+          {flowNewMember ? (
+            <FlowSteps
+              steps={["Add member", "Start membership", "Record payment"]}
+              shortLabels={["Member", "Membership", "Payment"]}
+              currentStep={3}
+            />
+          ) : null}
           <p className="mt-1 text-sm text-zinc-600">All payments and receipts.</p>
         </div>
         <Link
@@ -180,7 +189,7 @@ export default function PaymentsPage() {
               <div className="col-span-2 text-right">
                 <Link
                   href={`/payments/${p.id}`}
-                  className="font-medium underline underline-offset-4"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-end font-medium underline underline-offset-4"
                 >
                   →
                 </Link>

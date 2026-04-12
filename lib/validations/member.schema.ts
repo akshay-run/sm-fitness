@@ -16,15 +16,21 @@ const emptyToUndef = (v: unknown) =>
 
 const emailOptional = z.preprocess(
   (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-  z.string().trim().email("Invalid email format").optional()
+  z.string().trim().email("Check this email — it doesn't look right").optional()
 );
 
 export const createMemberSchema = z.object({
-  full_name: z.string().trim().min(2, "Full name is required"),
+  full_name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters"),
   mobile: z
     .string()
     .trim()
-    .regex(/^[0-9]{10}$/, "Mobile must be 10 digits"),
+    .min(1, "Mobile number is required")
+    .regex(/^[0-9]+$/, "Only numbers allowed")
+    .refine((s) => s.length === 10, "Must be exactly 10 digits"),
   email: emailOptional,
   date_of_birth: z.string().optional().or(z.literal("")),
   gender: z.preprocess(emptyToUndef, z.enum(["male", "female", "other"]).optional()),
@@ -34,7 +40,7 @@ export const createMemberSchema = z.object({
   joining_date: z
     .string()
     .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Joining date must be a valid date"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid date"),
 });
 
 export const updateMemberSchema = createMemberSchema

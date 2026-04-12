@@ -91,6 +91,8 @@ vi.mock("@/lib/supabaseAdmin", () => ({
   }),
 }));
 
+import { GET } from "./route";
+
 describe("GET /api/cron/backup", () => {
   const OLD = process.env.CRON_SECRET;
 
@@ -105,14 +107,12 @@ describe("GET /api/cron/backup", () => {
   });
 
   it("returns 401 without bearer", async () => {
-    const { GET } = await import("@/app/api/cron/backup/route");
     const req = new Request("http://localhost/api/cron/backup") as unknown as NextRequest;
     const res = await GET(req);
     expect(res.status).toBe(401);
   });
 
   it("sends backup and logs when authorized", async () => {
-    const { GET } = await import("@/app/api/cron/backup/route");
     const req = new Request("http://localhost/api/cron/backup", {
       headers: { Authorization: "Bearer secret" },
     }) as unknown as NextRequest;

@@ -2,16 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { differenceInDays, format } from "date-fns";
-import { z } from "zod";
+import type { ZodIssue } from "zod";
 import { addDaysIST, addMonthsIST, todayISTDateString } from "@/lib/dateUtils";
+import { membershipFormSchema } from "@/lib/validations/membership.schema";
 
-const schema = z.object({
-  plan_id: z.string().uuid("Select a plan"),
-  fee_charged: z.coerce
-    .number()
-    .positive("Enter a valid fee")
-    .max(99_999, "Fee must be at most 99999"),
-});
+function mapIssuesToFields(issues: ZodIssue[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const i of issues) {
+    const k = i.path[0];
+    if (typeof k === "string" && out[k] === undefined) out[k] = i.message;
+  }
+  return out;
+}
+
+function inputClass(invalid: boolean): string {
+  return [
+    "w-full rounded-lg border px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0",
+    invalid
+      ? "border-red-400 bg-red-50 focus:border-red-400 focus-visible:ring-red-200"
+      : "border-zinc-200 focus:border-zinc-400 focus-visible:ring-zinc-400",
+  ].join(" ");
+}
 
 type Plan = { id: string; name: string; duration_months: number; default_price?: number | null };
 
@@ -29,7 +40,9 @@ export function MembershipForm({
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [fee, setFee] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [datesError, setDatesError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
   const selected = useMemo(
@@ -52,6 +65,16 @@ export function MembershipForm({
     return `Membership will run from ${format(start, "d MMM yyyy")} to ${format(end, "d MMM yyyy")} (${durationDays} days)`;
   }, [previewDates]);
 
+  const feeNumeric = useMemo(() => {
+    const t = fee.trim();
+    if (t === "") return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }, [fee]);
+
+  const feeHighWarning =
+    feeNumeric != null && feeNumeric > 50_000 && feeNumeric <= 99_999;
+
   useEffect(() => {
     if (!planId && plans[0]?.id) setPlanId(plans[0].id);
   }, [planId, plans]);
@@ -65,17 +88,19 @@ export function MembershipForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFieldErrors({});
+    setDatesError(null);
+    setFormError(null);
     setWarning(null);
 
-    const parsed = schema.safeParse({ plan_id: planId, fee_charged: fee });
+    const parsed = membershipFormSchema.safeParse({ plan_id: planId, fee_charged: fee });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      setFieldErrors(mapIssuesToFields(parsed.error.issues));
       return;
     }
 
     if (previewDates && previewDates.endStr <= previewDates.startStr) {
-      setError("Invalid dates — please contact support");
+      setDatesError("End date must be after start date");
       return;
     }
 
@@ -101,25 +126,35 @@ export function MembershipForm({
 
       onCreated({ id: json.id, start_date: json.start_date, end_date: json.end_date });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create membership");
+      setFormError(err instanceof Error ? err.message : "Failed to create membership");
     } finally {
       setSubmitting(false);
     }
   }
 
+  const fe = fieldErrors;
+
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-1">
+    <form onSubmit={submit} className="space-y-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-zinc-800" htmlFor="plan_id">
             Plan
           </label>
           <select
             id="plan_id"
-            aria-invalid={!!error}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            aria-invalid={!!fe.plan_id}
+            className={inputClass(!!fe.plan_id)}
             value={planId}
-            onChange={(e) => setPlanId(e.target.value)}
+            onChange={(e) => {
+              setFieldErrors((prev) => {
+                if (!prev.plan_id) return prev;
+                const next = { ...prev };
+                delete next.plan_id;
+                return next;
+              });
+              setPlanId(e.target.value);
+            }}
             disabled={submitting}
           >
             {plans.map((p) => (
@@ -131,23 +166,46 @@ export function MembershipForm({
               </option>
             ))}
           </select>
+          {fe.plan_id ? (
+            <p className="flex items-center gap-1 text-xs text-red-600">
+              <span aria-hidden>⚠</span> {fe.plan_id}
+            </p>
+          ) : null}
         </div>
 
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-zinc-800" htmlFor="fee_charged">
             Fee charged
           </label>
           <input
             id="fee_charged"
             inputMode="decimal"
-            aria-invalid={!!error}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            aria-invalid={!!fe.fee_charged}
+            className={inputClass(!!fe.fee_charged)}
             value={fee}
-            onChange={(e) => setFee(e.target.value)}
+            onChange={(e) => {
+              setFieldErrors((prev) => {
+                if (!prev.fee_charged) return prev;
+                const next = { ...prev };
+                delete next.fee_charged;
+                return next;
+              });
+              setFee(e.target.value);
+            }}
             disabled={submitting}
             placeholder="e.g. 1200"
             required
           />
+          {fe.fee_charged ? (
+            <p className="flex items-center gap-1 text-xs text-red-600">
+              <span aria-hidden>⚠</span> {fe.fee_charged}
+            </p>
+          ) : null}
+          {feeHighWarning ? (
+            <p className="text-xs text-amber-700">
+              That seems high — double-check the amount
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -155,8 +213,14 @@ export function MembershipForm({
         <p className="text-sm italic text-slate-500">{previewLine}</p>
       ) : null}
 
+      {datesError ? (
+        <p className="flex items-center gap-1 text-xs text-red-600">
+          <span aria-hidden>⚠</span> {datesError}
+        </p>
+      ) : null}
+
       {selected ? (
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-700">
           Dates are auto-calculated based on existing active membership (if any).
         </div>
       ) : null}
@@ -167,9 +231,9 @@ export function MembershipForm({
         </div>
       ) : null}
 
-      {error ? (
+      {formError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {formError}
         </div>
       ) : null}
 

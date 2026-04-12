@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ZodIssue } from "zod";
 import { createMemberSchema, type CreateMemberInput } from "@/lib/validations/member.schema";
 import { todayISTDateString } from "@/lib/dateUtils";
+import {
+  formatInitialMobile,
+  formatMobileDisplay,
+  hasNonDigitExceptSpace,
+} from "@/lib/formatMobile";
 
 const SUSPICIOUS_EMAIL_DOMAINS = new Set([
   "gmial.com",
@@ -21,6 +27,24 @@ function suspiciousEmailDomain(email: string): boolean {
   return SUSPICIOUS_EMAIL_DOMAINS.has(domain);
 }
 
+function mapIssuesToFields(issues: ZodIssue[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const i of issues) {
+    const k = i.path[0];
+    if (typeof k === "string" && out[k] === undefined) out[k] = i.message;
+  }
+  return out;
+}
+
+function inputClass(invalid: boolean): string {
+  return [
+    "w-full rounded-lg border px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0",
+    invalid
+      ? "border-red-400 bg-red-50 focus:border-red-400 focus-visible:ring-red-200"
+      : "border-zinc-200 focus:border-zinc-400 focus-visible:ring-zinc-400",
+  ].join(" ");
+}
+
 type Props = {
   initial?: Partial<CreateMemberInput>;
   submitLabel: string;
@@ -33,7 +57,7 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
     const today = todayISTDateString();
     return {
       full_name: initial?.full_name ?? "",
-      mobile: initial?.mobile ?? "",
+      mobile: formatInitialMobile(initial?.mobile),
       email: initial?.email ?? "",
       date_of_birth: initial?.date_of_birth ?? "",
       gender: initial?.gender ?? undefined,
@@ -46,21 +70,36 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
 
   const [form, setForm] = useState(defaults);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [emailTypoHint, setEmailTypoHint] = useState(false);
+  const [mobileFormatError, setMobileFormatError] = useState<string | null>(null);
+
+  function clearField(key: string) {
+    setFieldErrors((prev) => {
+      if (prev[key] === undefined) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFieldErrors({});
+    setFormError(null);
+    setMobileFormatError(null);
 
+    const mobileRaw = form.mobile.replace(/\s/g, "");
     const payload = {
       ...form,
+      mobile: mobileRaw,
       blood_group: form.blood_group === "" ? undefined : form.blood_group,
     };
 
     const parsed = createMemberSchema.safeParse(payload);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      setFieldErrors(mapIssuesToFields(parsed.error.issues));
       return;
     }
 
@@ -68,53 +107,75 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
     try {
       await onSubmit(parsed.data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setFormError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
     }
   }
 
+  const fe = fieldErrors;
+
   return (
     <div className="relative pb-24 md:pb-4">
-      <p className="mb-4 text-xs text-zinc-500">Step 1 of 1 — Basic info</p>
-
       <form id="member-form" onSubmit={handleSubmit} className="space-y-6">
         <section>
           <h2 className="text-sm font-semibold text-zinc-900">Required info</h2>
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Full name" required htmlFor="full_name">
+          <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Full name" required htmlFor="full_name" error={fe.full_name}>
               <input
                 id="full_name"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
-                aria-invalid={!!error}
+                className={inputClass(!!fe.full_name)}
+                aria-invalid={!!fe.full_name}
                 value={form.full_name}
-                onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+                onChange={(e) => {
+                  clearField("full_name");
+                  setForm((f) => ({ ...f, full_name: e.target.value }));
+                }}
                 disabled={submitting}
                 required
               />
             </Field>
 
-            <Field label="Mobile" required hint="10 digits" htmlFor="mobile">
+            <Field
+              label="Mobile"
+              required
+              hint="10-digit Indian mobile number"
+              htmlFor="mobile"
+              error={fe.mobile ?? mobileFormatError ?? undefined}
+            >
               <input
                 id="mobile"
+                type="tel"
                 inputMode="numeric"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
-                aria-invalid={!!error}
+                autoComplete="tel"
+                maxLength={11}
+                placeholder="98765 43210"
+                className={inputClass(!!(fe.mobile || mobileFormatError))}
+                aria-invalid={!!(fe.mobile || mobileFormatError)}
                 value={form.mobile}
-                onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+                onChange={(e) => {
+                  clearField("mobile");
+                  const v = e.target.value;
+                  setMobileFormatError(
+                    hasNonDigitExceptSpace(v) ? "Only numbers allowed" : null
+                  );
+                  setForm((f) => ({ ...f, mobile: formatMobileDisplay(v) }));
+                }}
                 disabled={submitting}
                 required
               />
             </Field>
 
-            <Field label="Email (optional)" htmlFor="email">
+            <Field label="Email (optional)" htmlFor="email" error={fe.email}>
               <input
                 id="email"
                 type="email"
                 placeholder="member@gmail.com"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.email)}
+                aria-invalid={!!fe.email}
                 value={form.email ?? ""}
                 onChange={(e) => {
+                  clearField("email");
                   setEmailTypoHint(false);
                   setForm((f) => ({ ...f, email: e.target.value }));
                 }}
@@ -123,7 +184,7 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
               />
               {emailTypoHint ? (
                 <p className="mt-1 text-xs text-amber-700">
-                  This email looks unusual — double-check before saving.
+                  This email looks unusual — double-check it
                 </p>
               ) : null}
             </Field>
@@ -132,29 +193,33 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
 
         <div className="border-t border-zinc-200 pt-6">
           <h2 className="text-sm font-semibold text-zinc-900">Additional info</h2>
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Date of birth (optional)" htmlFor="date_of_birth">
+          <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <Field label="Date of birth (optional)" htmlFor="date_of_birth" error={fe.date_of_birth}>
               <input
                 id="date_of_birth"
                 type="date"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.date_of_birth)}
                 value={form.date_of_birth ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
+                onChange={(e) => {
+                  clearField("date_of_birth");
+                  setForm((f) => ({ ...f, date_of_birth: e.target.value }));
+                }}
                 disabled={submitting}
               />
             </Field>
 
-            <Field label="Gender (optional)" htmlFor="gender">
+            <Field label="Gender (optional)" htmlFor="gender" error={fe.gender}>
               <select
                 id="gender"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.gender)}
                 value={form.gender ?? ""}
-                onChange={(e) =>
+                onChange={(e) => {
+                  clearField("gender");
                   setForm((f) => ({
                     ...f,
                     gender: (e.target.value || undefined) as GenderValue,
-                  }))
-                }
+                  }));
+                }}
                 disabled={submitting}
               >
                 <option value="">Select</option>
@@ -164,28 +229,32 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
               </select>
             </Field>
 
-            <Field label="Joining date" htmlFor="joining_date">
+            <Field label="Joining date" htmlFor="joining_date" error={fe.joining_date}>
               <input
                 id="joining_date"
                 type="date"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.joining_date)}
                 value={form.joining_date ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, joining_date: e.target.value }))}
+                onChange={(e) => {
+                  clearField("joining_date");
+                  setForm((f) => ({ ...f, joining_date: e.target.value }));
+                }}
                 disabled={submitting}
               />
             </Field>
 
-            <Field label="Blood group (optional)" htmlFor="blood_group">
+            <Field label="Blood group (optional)" htmlFor="blood_group" error={fe.blood_group}>
               <select
                 id="blood_group"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.blood_group)}
                 value={form.blood_group === "" ? "" : form.blood_group}
-                onChange={(e) =>
+                onChange={(e) => {
+                  clearField("blood_group");
                   setForm((f) => ({
                     ...f,
                     blood_group: e.target.value,
-                  }))
-                }
+                  }));
+                }}
                 disabled={submitting}
               >
                 <option value="">Select</option>
@@ -202,35 +271,41 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
           </div>
 
           <div className="mt-4">
-            <Field label="Address (optional)" htmlFor="address">
+            <Field label="Address (optional)" htmlFor="address" error={fe.address}>
               <textarea
                 id="address"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.address)}
                 rows={3}
                 value={form.address ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                onChange={(e) => {
+                  clearField("address");
+                  setForm((f) => ({ ...f, address: e.target.value }));
+                }}
                 disabled={submitting}
               />
             </Field>
           </div>
 
           <div className="mt-4">
-            <Field label="Admin notes (optional)" htmlFor="notes">
+            <Field label="Admin notes (optional)" htmlFor="notes" error={fe.notes}>
               <textarea
                 id="notes"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                className={inputClass(!!fe.notes)}
                 rows={4}
                 value={form.notes ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                onChange={(e) => {
+                  clearField("notes");
+                  setForm((f) => ({ ...f, notes: e.target.value }));
+                }}
                 disabled={submitting}
               />
             </Field>
           </div>
         </div>
 
-        {error ? (
+        {formError ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
+            {formError}
           </div>
         ) : null}
 
@@ -264,16 +339,18 @@ function Field({
   required,
   hint,
   htmlFor,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
   htmlFor?: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
         <label className="text-sm font-medium text-zinc-800" htmlFor={htmlFor}>
           {label} {required ? <span className="text-red-600">*</span> : null}
@@ -281,6 +358,11 @@ function Field({
         {hint ? <span className="text-xs text-zinc-500">{hint}</span> : null}
       </div>
       {children}
+      {error ? (
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-red-600">
+          <span aria-hidden>⚠</span> {error}
+        </p>
+      ) : null}
     </div>
   );
 }

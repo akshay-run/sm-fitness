@@ -2,14 +2,27 @@
 
 import { useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
 import { toast } from "sonner";
-import { z } from "zod";
+import type { ZodIssue } from "zod";
 import { UPIQRModal } from "@/components/payments/UPIQRModal";
+import { paymentFormSchema } from "@/lib/validations/payment.schema";
 
-const schema = z.object({
-  payment_mode: z.enum(["cash", "upi"]),
-  upi_ref: z.string().trim().max(100).optional().or(z.literal("")),
-  notes: z.string().trim().max(2000).optional().or(z.literal("")),
-});
+function mapIssuesToFields(issues: ZodIssue[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const i of issues) {
+    const k = i.path[0];
+    if (typeof k === "string" && out[k] === undefined) out[k] = i.message;
+  }
+  return out;
+}
+
+function inputClass(invalid: boolean): string {
+  return [
+    "w-full rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-0",
+    invalid
+      ? "border-red-400 bg-red-50 focus:border-red-400 focus-visible:ring-red-200"
+      : "border-zinc-200 focus:border-zinc-400 focus-visible:ring-zinc-400",
+  ].join(" ");
+}
 
 export function PaymentForm({
   membershipId,
@@ -27,7 +40,9 @@ export function PaymentForm({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cashRecording, setCashRecording] = useOptimistic(false, (_prev, next: boolean) => next);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [upiConfigError, setUpiConfigError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [settingsUpi, setSettingsUpi] = useState<string | null>(null);
   const [uploadedQrUrl, setUploadedQrUrl] = useState<string | null>(null);
@@ -41,7 +56,7 @@ export function PaymentForm({
         const json = await res.json();
         if (!res.ok || cancelled) return;
         if (json.upi_id) setSettingsUpi(String(json.upi_id));
-        if (json.upi_qr_signed_url) setUploadedQrUrl(json.upi_qr_signed_url);
+        if (json.upi_qr_signed_url) setUploadedQrUrl(String(json.upi_qr_signed_url));
         if (json.gym_name) setSettingsGymName(String(json.gym_name));
       } catch {
         /* ignore */
@@ -68,20 +83,22 @@ export function PaymentForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFieldErrors({});
+    setUpiConfigError(null);
+    setFormError(null);
 
     if (mode === "upi" && !upiId && !uploadedQrUrl) {
-      setError("Configure UPI ID or upload a UPI QR in Settings.");
+      setUpiConfigError("Configure UPI ID or upload a UPI QR in Settings.");
       return;
     }
 
-    const parsed = schema.safeParse({
+    const parsed = paymentFormSchema.safeParse({
       payment_mode: mode,
       upi_ref: upiRef,
       notes,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      setFieldErrors(mapIssuesToFields(parsed.error.issues));
       return;
     }
 
@@ -111,7 +128,7 @@ export function PaymentForm({
       if (isCash) {
         toast.error("Something went wrong. Please try again.");
       }
-      setError(err instanceof Error ? err.message : "Failed to record payment");
+      setFormError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
       setSubmitting(false);
       if (isCash) {
@@ -121,6 +138,8 @@ export function PaymentForm({
       }
     }
   }
+
+  const fe = fieldErrors;
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6">
@@ -135,11 +154,14 @@ export function PaymentForm({
         </p>
       </div>
 
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-5">
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setMode("cash")}
+            onClick={() => {
+              setMode("cash");
+              setUpiConfigError(null);
+            }}
             className={[
               "rounded-lg px-3 py-2 text-sm",
               mode === "cash"
@@ -152,7 +174,10 @@ export function PaymentForm({
           </button>
           <button
             type="button"
-            onClick={() => setMode("upi")}
+            onClick={() => {
+              setMode("upi");
+              setUpiConfigError(null);
+            }}
             className={[
               "rounded-lg px-3 py-2 text-sm",
               mode === "upi"
@@ -170,6 +195,11 @@ export function PaymentForm({
             <div className="text-xs text-zinc-600">
               QR shown for amount ₹{amount}. After payment, click “Confirm payment”.
             </div>
+            {upiConfigError ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {upiConfigError}
+              </p>
+            ) : null}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-zinc-800" htmlFor="upi_ref">
@@ -177,12 +207,20 @@ export function PaymentForm({
                 </label>
                 <input
                   id="upi_ref"
-                  aria-invalid={!!error}
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  aria-invalid={!!fe.upi_ref}
+                  className={inputClass(!!fe.upi_ref)}
                   value={upiRef}
-                  onChange={(e) => setUpiRef(e.target.value)}
+                  onChange={(e) => {
+                    setUpiRef(e.target.value);
+                    if (fe.upi_ref) setFieldErrors((p) => ({ ...p, upi_ref: "" }));
+                  }}
                   disabled={submitting || cashRecording}
                 />
+                {fe.upi_ref ? (
+                  <p className="flex items-center gap-1 text-xs text-red-600">
+                    <span aria-hidden>⚠</span> {fe.upi_ref}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-zinc-800" htmlFor="upi_notes">
@@ -190,11 +228,20 @@ export function PaymentForm({
                 </label>
                 <input
                   id="upi_notes"
-                  className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                  aria-invalid={!!fe.notes}
+                  className={inputClass(!!fe.notes)}
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    if (fe.notes) setFieldErrors((p) => ({ ...p, notes: "" }));
+                  }}
                   disabled={submitting || cashRecording}
                 />
+                {fe.notes ? (
+                  <p className="flex items-center gap-1 text-xs text-red-600">
+                    <span aria-hidden>⚠</span> {fe.notes}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -206,18 +253,27 @@ export function PaymentForm({
               </label>
               <input
                 id="cash_notes"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+                aria-invalid={!!fe.notes}
+                className={inputClass(!!fe.notes)}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  if (fe.notes) setFieldErrors((p) => ({ ...p, notes: "" }));
+                }}
                 disabled={submitting || cashRecording}
               />
+              {fe.notes ? (
+                <p className="flex items-center gap-1 text-xs text-red-600">
+                  <span aria-hidden>⚠</span> {fe.notes}
+                </p>
+              ) : null}
             </div>
           </div>
         )}
 
-        {error ? (
+        {formError ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
+            {formError}
           </div>
         ) : null}
 
@@ -243,4 +299,3 @@ export function PaymentForm({
     </div>
   );
 }
-

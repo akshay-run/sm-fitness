@@ -11,6 +11,7 @@
 | [SM_FITNESS_PROJECT_CONTEXT.txt](./SM_FITNESS_PROJECT_CONTEXT.txt) | Original product constraints and scope (reference). |
 | [BACKUP_SYSTEM.md](./BACKUP_SYSTEM.md) | 5-day member backup email cron, schedule, and setup. |
 | [WHATSAPP_FEATURES.md](./WHATSAPP_FEATURES.md) | WhatsApp deep links: welcome, receipt, reminders. |
+| [ADMIN_UI_UX.md](./ADMIN_UI_UX.md) | Onboarding flow (`flow=new_member`), `FlowSteps`, form validation UX, tap targets, members search. |
 
 Internal / historical notes: [issue-list.txt](./issue-list.txt) (may be outdated; use UAT/E2E docs for release).
 

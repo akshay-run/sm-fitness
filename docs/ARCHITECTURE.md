@@ -18,10 +18,12 @@ app/
   (auth)/login/          # Login UI (Supabase Auth)
   (dashboard)/           # Admin UI: members, payments, reports, dashboard home
   api/                   # Route handlers (REST-style JSON APIs)
-components/              # Shared UI (forms, sidebar, email templates, etc.)
+components/              # Shared UI (forms, sidebar, email templates, FlowSteps, etc.)
 lib/                     # Auth, Supabase clients, email, cron, formatting, validations
 middleware.ts            # Session refresh / route protection (see Next.js docs for latest conventions)
 ```
+
+Product-facing UI patterns (onboarding query flags, form errors, tap targets): [ADMIN_UI_UX.md](./ADMIN_UI_UX.md).
 
 ## Authentication and authorization
 

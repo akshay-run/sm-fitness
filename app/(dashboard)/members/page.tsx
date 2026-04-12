@@ -244,16 +244,27 @@ export default function MembersPage() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:max-w-xl">
+        <div className="relative w-full sm:max-w-xl">
           <label htmlFor="members-search" className="sr-only">
             Search by name or mobile number
           </label>
+          <svg
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3-3" strokeLinecap="round" />
+          </svg>
           <input
             id="members-search"
             value={inputQ}
             onChange={(e) => setInputQ(e.target.value)}
-            placeholder="Search by name or mobile number"
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            placeholder="e.g. Rahul or 98765..."
+            className="w-full rounded-lg border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           />
         </div>
 
@@ -301,7 +312,7 @@ export default function MembersPage() {
           </div>
         ) : visibleMembers.length ? (
           visibleMembers.map((m) => (
-            <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-4">
+            <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   {m.photo_signed_url ? (
@@ -340,13 +351,13 @@ export default function MembersPage() {
                     <>
                       <a
                         href={whatsappLink(m.mobile, reminderForMember(m))}
-                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         WhatsApp
                       </a>
                       <a
                         href={smsLink(m.mobile, reminderForMember(m))}
-                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         SMS
                       </a>
@@ -354,13 +365,16 @@ export default function MembersPage() {
                   ) : (
                     <Link
                       href={`/memberships/new?memberId=${m.id}`}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-xs hover:bg-zinc-50"
                     >
                       Renew
                     </Link>
                   )}
                 </div>
-                <Link href={`/members/${m.id}`} className="text-sm font-medium text-[#1A1A2E] underline">
+                <Link
+                  href={`/members/${m.id}`}
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium text-[#1A1A2E] underline underline-offset-4"
+                >
                   Open →
                 </Link>
               </div>
@@ -432,9 +446,11 @@ function StatusBadge({
   status: "active" | "expiring" | "expired" | "none";
   daysLeft: number | null;
 }) {
-  if (status === "active") return <span className="status-success rounded px-2 py-1 text-xs">Active</span>;
+  if (status === "active") return <span className="status-success rounded-md px-2 py-1 text-xs">Active</span>;
   if (status === "expiring")
-    return <span className="status-warning rounded px-2 py-1 text-xs">Expires in {daysLeft ?? 0} days</span>;
-  if (status === "expired") return <span className="status-danger rounded px-2 py-1 text-xs">Expired</span>;
-  return <span className="status-neutral rounded px-2 py-1 text-xs">No membership</span>;
+    return (
+      <span className="status-warning rounded-md px-2 py-1 text-xs">Expires in {daysLeft ?? 0} days</span>
+    );
+  if (status === "expired") return <span className="status-danger rounded-md px-2 py-1 text-xs">Expired</span>;
+  return <span className="status-neutral rounded-md px-2 py-1 text-xs">No membership</span>;
 }

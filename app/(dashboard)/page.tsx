@@ -134,7 +134,7 @@ export default async function DashboardHome() {
                               gymName: gymBrand,
                             })
                           )}
-                          className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           WA
                         </a>
@@ -147,7 +147,7 @@ export default async function DashboardHome() {
                               gymName: gymBrand,
                             })
                           )}
-                          className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           SMS
                         </a>
@@ -199,7 +199,10 @@ export default async function DashboardHome() {
                     <div className="col-span-2 uppercase text-zinc-700">{p.payment_mode}</div>
                     <div className="col-span-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link href={`/payments/${p.id}`} className="text-sm font-medium underline">
+                        <Link
+                          href={`/payments/${p.id}`}
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium underline underline-offset-4"
+                        >
                           →
                         </Link>
                         <a
@@ -215,7 +218,7 @@ export default async function DashboardHome() {
                               mode: p.payment_mode.toUpperCase(),
                             })
                           )}
-                          className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           WA
                         </a>
@@ -251,7 +254,7 @@ function StatCard({
   pulse?: boolean;
 }) {
   return (
-    <div className="card-surface rounded-2xl border border-zinc-200 p-4">
+    <div className="card-surface rounded-2xl border border-zinc-200 p-5">
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         <span className={`rounded px-2 py-1 text-xs ${tint}`}>{icon}</span>

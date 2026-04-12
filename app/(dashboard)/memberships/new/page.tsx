@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { MembershipForm } from "@/components/memberships/MembershipForm";
+import { FlowSteps } from "@/components/ui/FlowSteps";
 
-type Plan = { id: string; name: string; duration_months: number };
+type Plan = { id: string; name: string; duration_months: number; default_price?: number | null };
 
 export default function NewMembershipPage() {
   const router = useRouter();
@@ -76,6 +77,11 @@ export default function NewMembershipPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Save membership
         </h1>
+        <FlowSteps
+          steps={["Add member", "Start membership", "Record payment"]}
+          shortLabels={["Member", "Membership", "Payment"]}
+          currentStep={2}
+        />
         <p className="mt-1 text-sm text-zinc-600">
           Member: <span className="font-medium text-zinc-900">{memberName || "…"}</span>
         </p>
@@ -99,7 +105,7 @@ export default function NewMembershipPage() {
             latestActiveEndDate={latestActiveEndDate}
             onCreated={({ id }) => {
               toast.success("Membership started ✓");
-              router.replace(`/payments?membershipId=${id}`);
+              router.replace(`/payments?membershipId=${id}&flow=new_member`);
               router.refresh();
             }}
           />

@@ -13,13 +13,14 @@ Admin-only gym management PWA: members, memberships, payments (cash + UPI QR), e
 | [docs/ENV_CONFIGURATION.md](docs/ENV_CONFIGURATION.md) | Full `.env` variable reference, security, troubleshooting. |
 | [docs/ENV_SETUP_CHECKLIST.md](docs/ENV_SETUP_CHECKLIST.md) | Quick env checklist before first run. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Codebase layout, auth, API map, data rules. |
+| [docs/ADMIN_UI_UX.md](docs/ADMIN_UI_UX.md) | Onboarding flow, form validation UX, FlowSteps, tap targets. |
 | [docs/UAT_CHECKLIST.md](docs/UAT_CHECKLIST.md) | Pre-release acceptance testing. |
 | [docs/E2E_TEST_MATRIX.md](docs/E2E_TEST_MATRIX.md) | Test cases, slow-network checks, automated gate log. |
 | [.env.example](.env.example) | Safe template (copy to `.env.local`; do not commit secrets). |
 
 ## Features
 
-- **Members:** Create, edit, soft deactivate; auto member code; photo upload or webcam (compressed).
+- **Members:** Create, edit, archive/restore; auto member code; photo upload or webcam (compressed); search with inline icon; profile sections and next-step hints for membership/payment.
 - **Memberships:** Plans (monthly/quarterly/half-yearly/annual), custom fee, IST dates, renewal rules.
 - **Payments:** Cash or UPI (QR + manual confirm), one payment per membership, receipt numbering, HTML email receipt.
 - **Email:** Welcome, receipt, expiry reminders (cron); duplicate prevention and logs; resend; periodic **member backup** HTML email (cron).
