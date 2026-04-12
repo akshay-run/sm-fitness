@@ -12,6 +12,7 @@ import {
   smsLink,
   whatsappLink,
 } from "@/lib/messageTemplates";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type MemberTab = "all" | "active_membership" | "expired" | "deactivated";
 
@@ -46,7 +47,7 @@ const TAB_LABELS: { id: MemberTab; short: string }[] = [
   { id: "all", short: "All" },
   { id: "active_membership", short: "Active" },
   { id: "expired", short: "Expired" },
-  { id: "deactivated", short: "Deactivated" },
+  { id: "deactivated", short: "Archived" },
 ];
 
 export default function MembersPage() {
@@ -69,6 +70,7 @@ export default function MembersPage() {
     tabCounts: { all: 0, active_membership: 0, expired: 0, deactivated: 0 },
   };
   const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
+  const [restoreTarget, setRestoreTarget] = useState<MemberListItem | null>(null);
   const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(
     null,
     (_prev, id: string | null) => id
@@ -199,21 +201,31 @@ export default function MembersPage() {
         startTransition(() => {
           setHiddenReactivateId(null);
         });
-        toast.error(json?.error ?? "Action failed — please try again");
+        toast.error(json?.error ?? "Something went wrong. Please try again.");
         return;
       }
       startTransition(() => {
         setHiddenReactivateId(null);
       });
-      toast.success("Member reactivated ✓");
+      toast.success(`${m.full_name} is back in your active list`);
       await queryClient.invalidateQueries({ queryKey: ["members"] });
       navigate({ tab: "all", page: 1 });
     } catch {
       startTransition(() => {
         setHiddenReactivateId(null);
       });
-      toast.error("Action failed — please try again");
+      toast.error("Something went wrong. Please try again.");
     }
+  }
+
+  function emptyListMessage() {
+    if (tab === "deactivated") {
+      return "No archived members. All your members are currently active 🎉";
+    }
+    if (q.trim()) {
+      return "No members match your search. Try a different name or number.";
+    }
+    return "No members yet. Tap 'New Member' to add your first one.";
   }
 
   return (
@@ -221,26 +233,26 @@ export default function MembersPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Members</h1>
-          <p className="mt-1 text-sm text-slate-500">Search by name or mobile</p>
+          <p className="mt-1 text-sm text-slate-500">Find members by name or mobile number.</p>
         </div>
         <Link
           href="/members/new"
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
         >
-          Add member
+          New Member
         </Link>
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="w-full sm:max-w-xl">
           <label htmlFor="members-search" className="sr-only">
-            Search members by name or mobile
+            Search by name or mobile number
           </label>
           <input
             id="members-search"
             value={inputQ}
             onChange={(e) => setInputQ(e.target.value)}
-            placeholder="Search name or mobile"
+            placeholder="Search by name or mobile number"
             className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           />
         </div>
@@ -285,7 +297,7 @@ export default function MembersPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         ) : data.items.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-            No members found.
+            {emptyListMessage()}
           </div>
         ) : visibleMembers.length ? (
           visibleMembers.map((m) => (
@@ -319,30 +331,22 @@ export default function MembersPage() {
                   {tab === "deactivated" ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Reactivate ${m.full_name}? They will appear in the active members list and can be assigned a new membership.`
-                          )
-                        ) {
-                          void reactivateMember(m);
-                        }
-                      }}
-                      className="rounded-lg border border-green-600 bg-green-50 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-100"
+                      onClick={() => setRestoreTarget(m)}
+                      className="rounded-lg border border-green-600 bg-white px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-50"
                     >
-                      Reactivate
+                      Restore member
                     </button>
                   ) : m.membership_status === "active" || m.membership_status === "expiring" ? (
                     <>
                       <a
                         href={whatsappLink(m.mobile, reminderForMember(m))}
-                        className="status-success rounded px-2 py-1 text-xs"
+                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         WhatsApp
                       </a>
                       <a
                         href={smsLink(m.mobile, reminderForMember(m))}
-                        className="status-info rounded px-2 py-1 text-xs"
+                        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         SMS
                       </a>
@@ -398,6 +402,25 @@ export default function MembersPage() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={restoreTarget != null}
+        title={restoreTarget ? `Restore ${restoreTarget.full_name}?` : ""}
+        description={
+          restoreTarget
+            ? `${restoreTarget.full_name} will appear in the active members list\nand can be assigned a new membership.`
+            : undefined
+        }
+        cancelText="Not now"
+        confirmText="Yes, restore"
+        confirmTone="success"
+        onCancel={() => setRestoreTarget(null)}
+        onConfirm={() => {
+          const t = restoreTarget;
+          setRestoreTarget(null);
+          if (t) void reactivateMember(t);
+        }}
+      />
     </div>
   );
 }

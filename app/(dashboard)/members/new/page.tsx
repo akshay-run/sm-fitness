@@ -17,10 +17,10 @@ export default function NewMemberPage() {
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(json?.error ?? "Failed to create member");
+      throw new Error(json?.error ?? "Could not save. Please check your connection.");
     }
 
-    toast.success("Member created");
+    toast.success("Member added successfully ✓");
     router.replace(`/members/${json.id}`);
     router.refresh();
   }
@@ -29,7 +29,7 @@ export default function NewMemberPage() {
     <div className="mx-auto w-full max-w-3xl p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Add member
+          New Member
         </h1>
         <p className="mt-1 text-sm text-zinc-600">
           Mobile and email are required. Other fields are optional.
@@ -37,7 +37,7 @@ export default function NewMemberPage() {
       </div>
 
       <div className="rounded-2xl border border-zinc-200 bg-white p-6">
-        <MemberForm submitLabel="Create member" onSubmit={createMember} />
+        <MemberForm submitLabel="Save member" onSubmit={createMember} />
       </div>
     </div>
   );

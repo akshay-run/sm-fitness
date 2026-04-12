@@ -439,7 +439,7 @@ export default function ReportsPage() {
           <div className="card-surface mt-8 rounded-2xl border border-zinc-200 bg-white p-5">
             <h2 className="text-base font-semibold text-zinc-900">Payments</h2>
             {data.payments.length === 0 ? (
-              <EmptyState title="No payments" message="No payments in this period." />
+              <EmptyState title="No data" message="No payment data for this period." />
             ) : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">

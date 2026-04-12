@@ -51,7 +51,7 @@ export function SettingsClient() {
       setLogoUrl(json.logo_signed_url);
       setQrUrl(json.upi_qr_signed_url);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to load");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -78,12 +78,14 @@ export function SettingsClient() {
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error ?? "Save failed");
+      if (!res.ok) throw new Error(json?.error ?? "Could not save. Please check your connection.");
       toast.success("Settings saved ✓");
       setLogoUrl(json.logo_signed_url ?? null);
       setQrUrl(json.upi_qr_signed_url ?? null);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Save failed");
+      toast.error(
+        e instanceof Error ? e.message : "Could not save. Please check your connection."
+      );
     } finally {
       setSaving(false);
     }

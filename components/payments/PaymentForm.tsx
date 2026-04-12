@@ -105,11 +105,11 @@ export function PaymentForm({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Failed to record payment");
-      toast.success("Payment recorded");
+      toast.success("Payment recorded. Receipt sent by email ✓");
       onCreated(json.id);
     } catch (err: unknown) {
       if (isCash) {
-        toast.error("Action failed — please try again");
+        toast.error("Something went wrong. Please try again.");
       }
       setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
@@ -125,7 +125,7 @@ export function PaymentForm({
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-zinc-900">Record payment</h2>
+        <h2 className="text-lg font-semibold text-zinc-900">Add payment</h2>
         <p className="mt-1 text-sm text-zinc-600">
           Member: <span className="font-medium text-zinc-900">{memberName}</span> •
           Amount: <span className="font-medium text-zinc-900">₹{amount}</span>
@@ -230,7 +230,7 @@ export function PaymentForm({
             ? "Saving..."
             : mode === "upi"
               ? "Confirm payment"
-              : "Mark as paid"}
+              : "Confirm payment received"}
         </button>
       </form>
 

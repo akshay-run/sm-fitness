@@ -164,7 +164,7 @@ export default function PaymentDetailPage({
       startTransition(() => {
         setWelcomeSentOptimistic(false);
       });
-      toast.error("Action failed — please try again");
+      toast.error("Something went wrong. Please try again.");
     }
   }
   const badgeClass = payment.email_sent ? "status-success" : "status-warning";
@@ -257,7 +257,7 @@ export default function PaymentDetailPage({
             className="inline-flex items-center gap-2 rounded-lg border-2 border-green-600 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
           >
             <WhatsAppGlyph className="h-4 w-4 shrink-0" />
-            Send Welcome on WhatsApp
+            Send welcome on WhatsApp 👋
           </a>
         ) : null}
         <button
@@ -269,26 +269,32 @@ export default function PaymentDetailPage({
             const res = await fetch(`/api/payments/${payment.id}/resend`, { method: "POST" });
             const j = await res.json().catch(() => ({}));
             if (!res.ok) {
-              setError(j?.error ?? "Failed to resend receipt email");
+              setError(j?.error ?? "Email could not be sent. Check your Gmail settings.");
             } else if (j?.skipped) {
               setInfo("No email on file — receipt email was not sent.");
             } else {
-              setInfo("Receipt email resent successfully.");
+              setInfo("Receipt resent ✓");
             }
             setResending(false);
           }}
           disabled={resending}
-          className="rounded-lg border border-zinc-200 px-4 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60"
+          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
         >
-          {resending ? "Resending..." : "📧 Resend email"}
+          {resending ? "Resending..." : "Resend email"}
         </button>
         {member ? (
           <>
-            <a href={whatsappLink(member.mobile, shareMessage)} className="status-success rounded-lg px-4 py-2 text-sm">
-              💬 WhatsApp
+            <a
+              href={whatsappLink(member.mobile, shareMessage)}
+              className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              WhatsApp
             </a>
-            <a href={smsLink(member.mobile, shareMessage)} className="status-info rounded-lg px-4 py-2 text-sm">
-              📱 SMS
+            <a
+              href={smsLink(member.mobile, shareMessage)}
+              className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              SMS
             </a>
           </>
         ) : null}

@@ -178,7 +178,7 @@ export function MembershipForm({
         disabled={submitting}
         className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
       >
-        {submitting ? "Creating..." : "Create membership"}
+        {submitting ? "Saving..." : "Save membership"}
       </button>
     </form>
   );

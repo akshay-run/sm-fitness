@@ -88,7 +88,7 @@ export function PlansManager() {
       setPrice("");
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 
@@ -119,7 +119,7 @@ export function PlansManager() {
       setEditingId(null);
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 
@@ -136,7 +136,7 @@ export function PlansManager() {
       toast.success("Plan deactivated");
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 

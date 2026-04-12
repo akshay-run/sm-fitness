@@ -61,9 +61,9 @@ export default function EditMemberPage({
     });
 
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.error ?? "Failed to update member");
+    if (!res.ok) throw new Error(json?.error ?? "Could not save. Please check your connection.");
 
-    toast.success("Member updated");
+    toast.success("Changes saved ✓");
     router.replace(`/members/${member.id}`);
     router.refresh();
   }
@@ -114,7 +114,7 @@ export default function EditMemberPage({
             notes: member.notes ?? "",
             joining_date: jd,
           }}
-          submitLabel="Save changes"
+          submitLabel="Save member"
           onSubmit={save}
         />
       </div>

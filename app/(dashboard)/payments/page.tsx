@@ -121,8 +121,14 @@ export default function PaymentsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Payments
           </h1>
-          <p className="mt-1 text-sm text-zinc-600">Payment history and receipts.</p>
+          <p className="mt-1 text-sm text-zinc-600">All payments and receipts.</p>
         </div>
+        <Link
+          href="/members/new"
+          className="rounded-lg bg-[#1A1A2E] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
+        >
+          New Member
+        </Link>
       </div>
 
       {membershipId ? (
@@ -139,8 +145,7 @@ export default function PaymentsPage() {
         </div>
       ) : (
         <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-          To record a payment, open a member and create a membership, then come here with
-          a membership id.
+          To add a payment: open a member → start a membership → then record payment here.
         </div>
       )}
 
@@ -184,7 +189,7 @@ export default function PaymentsPage() {
           ))
         ) : (
           <div className="px-4 py-10 text-center text-sm text-zinc-600">
-            No payments yet.
+            No payments recorded yet.
           </div>
         )}
       </div>
