@@ -26,6 +26,23 @@ function effectiveMemberDate(row: {
   return formatInTimeZone(new Date(row.created_at), IST_TZ, "yyyy-MM-dd");
 }
 
+type PaymentNestedRow = {
+  id: string;
+  amount: number | string | null;
+  payment_mode: string;
+  payment_date: string;
+  membership_id: string;
+  member_id: string;
+  receipt_number: string;
+  members: { full_name: string; mobile: string | null } | null;
+  memberships: {
+    plan_id: string;
+    start_date: string;
+    end_date: string;
+    plans: { name: string } | null;
+  } | null;
+};
+
 export async function GET(req: Request) {
   const { user, error } = await requireUser();
   if (!user) return NextResponse.json({ error }, { status: 401 });
@@ -42,7 +59,19 @@ export async function GET(req: Request) {
 
   let payQuery = supabaseAdmin
     .from("payments")
-    .select("id, amount, payment_mode, payment_date, membership_id, member_id")
+    .select(
+      `
+      id,
+      amount,
+      payment_mode,
+      payment_date,
+      receipt_number,
+      membership_id,
+      member_id,
+      members ( full_name, mobile ),
+      memberships ( plan_id, start_date, end_date, plans ( name ) )
+    `
+    )
     .order("payment_date", { ascending: false });
 
   if (startIST && endIST) {
@@ -52,32 +81,7 @@ export async function GET(req: Request) {
   const { data: payments, error: payErr } = await payQuery;
   if (payErr) return NextResponse.json({ error: payErr.message }, { status: 500 });
 
-  const payRows = payments ?? [];
-  const memberIds = [...new Set(payRows.map((p) => String(p.member_id)))];
-  const membershipIds = [...new Set(payRows.map((p) => String(p.membership_id)))];
-
-  const [{ data: members }, { data: memberships }] = await Promise.all([
-    memberIds.length
-      ? supabaseAdmin.from("members").select("id, full_name, mobile").in("id", memberIds)
-      : { data: [] as { id: string; full_name: string; mobile: string }[] },
-    membershipIds.length
-      ? supabaseAdmin
-          .from("memberships")
-          .select("id, plan_id")
-          .in("id", membershipIds)
-      : { data: [] as { id: string; plan_id: string }[] },
-  ]);
-
-  const memberMap = new Map(
-    (members ?? []).map((m) => [String(m.id), { name: m.full_name, mobile: m.mobile ?? "" }])
-  );
-  const memShipMap = new Map((memberships ?? []).map((m) => [String(m.id), String(m.plan_id)]));
-
-  const planIds = [...new Set((memberships ?? []).map((m) => String(m.plan_id)))];
-  const { data: plans } = planIds.length
-    ? await supabaseAdmin.from("plans").select("id, name").in("id", planIds)
-    : { data: [] as { id: string; name: string }[] };
-  const planName = new Map((plans ?? []).map((p) => [String(p.id), p.name]));
+  const payRows = (payments ?? []) as PaymentNestedRow[];
 
   let cashTotal = 0;
   let upiTotal = 0;
@@ -100,11 +104,12 @@ export async function GET(req: Request) {
     if (p.payment_mode === "cash") cashTotal += amt;
     if (p.payment_mode === "upi") upiTotal += amt;
 
-    const pid = memShipMap.get(String(p.membership_id));
-    const pname = pid ? planName.get(pid) ?? "Plan" : "—";
-    if (pid) {
-      const cur = planRev.get(pid) ?? {
-        name: pname,
+    const planId = p.memberships?.plan_id != null ? String(p.memberships.plan_id) : null;
+    const planNameResolved = planId ? (p.memberships?.plans?.name ?? "Plan") : "—";
+
+    if (planId) {
+      const cur = planRev.get(planId) ?? {
+        name: planNameResolved,
         revenue: 0,
         payments: 0,
         members: new Set<string>(),
@@ -112,16 +117,16 @@ export async function GET(req: Request) {
       cur.revenue += amt;
       cur.payments += 1;
       cur.members.add(String(p.member_id));
-      planRev.set(pid, cur);
+      planRev.set(planId, cur);
     }
 
-    const mem = memberMap.get(String(p.member_id));
+    const mem = p.members;
     paymentList.push({
       id: String(p.id),
-      member_name: mem?.name ?? "Member",
+      member_name: mem?.full_name ?? "Member",
       member_mobile: mem?.mobile ?? "—",
       payment_date: String(p.payment_date),
-      plan_name: pname,
+      plan_name: planNameResolved,
       amount: amt,
       mode: String(p.payment_mode),
     });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -93,6 +93,14 @@ export default function MemberProfilePage({
   const [deactivating, setDeactivating] = useState(false);
   const [reactivating, setReactivating] = useState(false);
   const [welcomeWaSent, setWelcomeWaSent] = useState(false);
+  const [displayActive, setDisplayActiveOptimistic] = useOptimistic(
+    member?.is_active ?? true,
+    (_c, next: boolean) => next
+  );
+  const [displayWelcomeSent, setWelcomeSentOptimistic] = useOptimistic(
+    welcomeWaSent,
+    (_c, next: boolean) => next
+  );
   const [whatsappGroupLink, setWhatsappGroupLink] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipSummary | null>(null);
   const [membershipHistory, setMembershipHistory] = useState<MembershipHistoryRow[]>([]);
@@ -153,6 +161,9 @@ export default function MemberProfilePage({
   async function deactivate() {
     if (!member) return;
     setDeactivating(true);
+    startTransition(() => {
+      setDisplayActiveOptimistic(false);
+    });
     try {
       const res = await fetch(`/api/members/${member.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -163,7 +174,11 @@ export default function MemberProfilePage({
       const j2 = await r2.json();
       setMember(j2.member);
     } catch (e: unknown) {
+      startTransition(() => {
+        setDisplayActiveOptimistic(true);
+      });
       setError(e instanceof Error ? e.message : "Failed to deactivate");
+      toast.error("Action failed — please try again");
     } finally {
       setDeactivating(false);
     }
@@ -172,6 +187,9 @@ export default function MemberProfilePage({
   async function reactivate() {
     if (!member) return;
     setReactivating(true);
+    startTransition(() => {
+      setDisplayActiveOptimistic(true);
+    });
     try {
       const res = await fetch(`/api/members/${member.id}`, {
         method: "PATCH",
@@ -188,19 +206,33 @@ export default function MemberProfilePage({
       setWelcomeWaSent(j2.member?.welcome_wa_sent === true);
       toast.success("Member reactivated ✓");
     } catch (e: unknown) {
+      startTransition(() => {
+        setDisplayActiveOptimistic(false);
+      });
       setError(e instanceof Error ? e.message : "Failed to reactivate");
+      toast.error("Action failed — please try again");
     } finally {
       setReactivating(false);
     }
   }
 
   async function markWelcomeSent(memberId: string) {
+    startTransition(() => {
+      setWelcomeSentOptimistic(true);
+    });
     const res = await fetch(`/api/members/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ welcome_wa_sent: true }),
     });
-    if (res.ok) setWelcomeWaSent(true);
+    if (res.ok) {
+      setWelcomeWaSent(true);
+    } else {
+      startTransition(() => {
+        setWelcomeSentOptimistic(false);
+      });
+      toast.error("Action failed — please try again");
+    }
   }
 
   if (loading) {
@@ -275,9 +307,9 @@ export default function MemberProfilePage({
       : "";
 
   const showWelcomeWa =
-    member.is_active &&
+    displayActive &&
     Boolean(membership?.start_date && membership?.end_date) &&
-    !welcomeWaSent;
+    !displayWelcomeSent;
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
@@ -301,7 +333,7 @@ export default function MemberProfilePage({
           >
             Assign membership
           </Link>
-          {member.is_active ? (
+          {displayActive ? (
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}

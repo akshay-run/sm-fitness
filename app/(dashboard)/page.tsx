@@ -1,194 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { startOfMonth, subMonths } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
-import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
-import {
-  IST_TZ,
-  addDaysIST,
-  monthBoundsIST,
-  previousMonthBoundsIST,
-  todayISTDateString,
-} from "@/lib/dateUtils";
+import { loadDashboardHome } from "@/lib/queries/dashboardHome";
 import { formatAmountINR, formatDateLongIST, formatDateShortIST } from "@/lib/uiFormat";
 import {
   membershipRenewalReminderMessage,
   receiptMessage,
-  reminderMessage,
   smsLink,
   whatsappLink,
 } from "@/lib/messageTemplates";
 import { BulkRenewalReminders } from "@/components/dashboard/BulkRenewalReminders";
 import { RevenueMiniChart } from "@/components/dashboard/RevenueMiniChart";
 
-type UpcomingRow = {
-  membership_id: string;
-  member_id: string;
-  full_name: string;
-  mobile: string;
-  plan_name: string;
-  end_date: string;
-};
-
-type PaymentAmountRow = { amount: number | string | null };
 export const metadata: Metadata = {
   title: "Dashboard — SM FITNESS",
   description: "Gym overview and renewals",
 };
 
-type RecentPaymentRow = {
-  id: string;
-  membership_id: string;
-  member_id: string;
-  amount: number | string | null;
-  payment_mode: string;
-  receipt_number: string;
-  payment_date: string;
-};
-
 export default async function DashboardHome() {
-  const supabaseAdmin = createSupabaseAdminClient();
-
-  const today = todayISTDateString();
-  const in7 = addDaysIST(today, 7);
-
-  const [{ count: totalMembers }, { count: activeMembers }] = await Promise.all([
-    supabaseAdmin.from("members").select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("members")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-  ]);
-
-  const [{ count: expiredMemberships }, { count: expiringSoonMemberships }] = await Promise.all([
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .lt("end_date", today)
-      .neq("status", "cancelled"),
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .gte("end_date", today)
-      .lte("end_date", in7)
-      .neq("status", "cancelled"),
-  ]);
-
-  const { startIST: thisMonthStart, endIST: thisMonthEnd } = monthBoundsIST();
-  const { startIST: lastMonthStart, endIST: lastMonthEnd } = previousMonthBoundsIST();
-
-  const [thisMonthPayments, lastMonthPayments] = await Promise.all([
-    supabaseAdmin
-      .from("payments")
-      .select("amount")
-      .gte("payment_date", thisMonthStart)
-      .lt("payment_date", thisMonthEnd),
-    supabaseAdmin
-      .from("payments")
-      .select("amount")
-      .gte("payment_date", lastMonthStart)
-      .lt("payment_date", lastMonthEnd),
-  ]);
-
-  const thisMonthRevenue =
-    (thisMonthPayments.data as PaymentAmountRow[] | null)?.reduce(
-      (sum, p) => sum + Number(p.amount ?? 0),
-      0
-    ) ?? 0;
-  const lastMonthRevenue =
-    (lastMonthPayments.data as PaymentAmountRow[] | null)?.reduce(
-      (sum, p) => sum + Number(p.amount ?? 0),
-      0
-    ) ?? 0;
-
-  const { data: upcoming } = await supabaseAdmin
-    .from("memberships")
-    .select("id, member_id, plan_id, end_date")
-    .gte("end_date", today)
-    .lte("end_date", in7)
-    .neq("status", "cancelled")
-    .order("end_date", { ascending: true })
-    .limit(10);
-
-  const upcomingRows: UpcomingRow[] = [];
-  for (const m of upcoming ?? []) {
-    const [{ data: member }, { data: plan }] = await Promise.all([
-      supabaseAdmin
-        .from("members")
-        .select("id, full_name, mobile")
-        .eq("id", m.member_id)
-        .single(),
-      supabaseAdmin.from("plans").select("name").eq("id", m.plan_id).single(),
-    ]);
-    if (!member) continue;
-    upcomingRows.push({
-      membership_id: m.id,
-      member_id: member.id,
-      full_name: member.full_name,
-      mobile: member.mobile,
-      plan_name: plan?.name ?? "Plan",
-      end_date: String(m.end_date),
-    });
-  }
-
-  const { data: recentPayments } = await supabaseAdmin
-    .from("payments")
-    .select("id, amount, payment_mode, receipt_number, payment_date, member_id")
-    .order("payment_date", { ascending: false })
-    .limit(10);
-
-  const recentRows: Array<
-    RecentPaymentRow & {
-      member_name: string;
-      member_mobile: string;
-      plan_name: string;
-      start_date: string;
-      end_date: string;
-    }
-  > = [];
-  for (const p of (recentPayments as RecentPaymentRow[] | null) ?? []) {
-    const [{ data: member }, { data: membership }] = await Promise.all([
-      supabaseAdmin.from("members").select("full_name, mobile").eq("id", p.member_id).single(),
-      supabaseAdmin
-        .from("memberships")
-        .select("plan_id, start_date, end_date")
-        .eq("id", p.membership_id)
-        .single(),
-    ]);
-    const { data: plan } = membership?.plan_id
-      ? await supabaseAdmin.from("plans").select("name").eq("id", membership.plan_id).single()
-      : { data: null };
-    recentRows.push({
-      ...p,
-      member_name: member?.full_name ?? "Member",
-      member_mobile: member?.mobile ?? "",
-      plan_name: plan?.name ?? "Membership",
-      start_date: String(membership?.start_date ?? "-"),
-      end_date: String(membership?.end_date ?? "-"),
-    });
-  }
-
-  const trendUp = thisMonthRevenue >= lastMonthRevenue;
-
-  const revenueLast6: { month: string; total: number }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const ref = subMonths(startOfMonth(new Date()), i);
-    const { startIST, endIST } = monthBoundsIST(ref);
-    const { data: monthPay } = await supabaseAdmin
-      .from("payments")
-      .select("amount")
-      .gte("payment_date", startIST)
-      .lt("payment_date", endIST);
-    const total =
-      (monthPay as PaymentAmountRow[] | null)?.reduce((sum, p) => sum + Number(p.amount ?? 0), 0) ??
-      0;
-    revenueLast6.push({
-      month: formatInTimeZone(ref, IST_TZ, "MMM yy"),
-      total,
-    });
-  }
-
-  const gymBrand = process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS";
+  const {
+    today,
+    totalMembers,
+    activeMembers,
+    expiredMemberships,
+    expiringSoonMemberships,
+    thisMonthRevenue,
+    lastMonthRevenue,
+    trendUp,
+    upcomingRows,
+    recentRows,
+    revenueLast6,
+    gymBrand,
+  } = await loadDashboardHome();
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
@@ -210,14 +52,14 @@ export default async function DashboardHome() {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <StatCard icon="👥" tint="status-neutral" label="Total members" value={String(totalMembers ?? 0)} />
-        <StatCard icon="✅" tint="status-success" label="Active members" value={String(activeMembers ?? 0)} />
+        <StatCard icon="👥" tint="status-neutral" label="Total members" value={String(totalMembers)} />
+        <StatCard icon="✅" tint="status-success" label="Active members" value={String(activeMembers)} />
         <StatCard
           icon="⚠️"
           tint="status-danger"
           label="Expired"
-          value={String(expiredMemberships ?? 0)}
-          pulse={(expiredMemberships ?? 0) > 0}
+          value={String(expiredMemberships)}
+          pulse={expiredMemberships > 0}
         />
         <Link
           href="/members?expiring_within_days=7"
@@ -227,8 +69,8 @@ export default async function DashboardHome() {
             icon="🔔"
             tint="status-warning"
             label="Expiring in 7d"
-            value={String(expiringSoonMemberships ?? 0)}
-            pulse={(expiringSoonMemberships ?? 0) > 0}
+            value={String(expiringSoonMemberships)}
+            pulse={expiringSoonMemberships > 0}
           />
         </Link>
       </div>
@@ -416,4 +258,3 @@ function StatCard({
     </div>
   );
 }
-

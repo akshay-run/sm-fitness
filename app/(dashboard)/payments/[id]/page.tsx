@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { formatAmountINR, formatDateShortIST, formatDateTimeIST } from "@/lib/uiFormat";
 import {
   receiptMessage,
@@ -66,6 +67,10 @@ export default function PaymentDetailPage({
   const [resending, setResending] = useState(false);
   const [gym, setGym] = useState<GymBranding | null>(null);
   const [welcomeWaSent, setWelcomeWaSent] = useState(false);
+  const [displayWelcomeSent, setWelcomeSentOptimistic] = useOptimistic(
+    welcomeWaSent,
+    (_c, next: boolean) => next
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -142,15 +147,25 @@ export default function PaymentDetailPage({
       : "";
 
   const showWelcomeWa =
-    Boolean(member && membership && plan) && !welcomeWaSent;
+    Boolean(member && membership && plan) && !displayWelcomeSent;
 
   async function markWelcomeSent(memberId: string) {
+    startTransition(() => {
+      setWelcomeSentOptimistic(true);
+    });
     const res = await fetch(`/api/members/${memberId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ welcome_wa_sent: true }),
     });
-    if (res.ok) setWelcomeWaSent(true);
+    if (res.ok) {
+      setWelcomeWaSent(true);
+    } else {
+      startTransition(() => {
+        setWelcomeSentOptimistic(false);
+      });
+      toast.error("Action failed — please try again");
+    }
   }
   const badgeClass = payment.email_sent ? "status-success" : "status-warning";
   const badgeText = payment.email_sent ? "Receipt email sent ✓" : "Receipt email not sent yet";

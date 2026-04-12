@@ -12,7 +12,7 @@ import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  pageSize: z.coerce.number().int().min(1).max(50).default(25),
 });
 
 export async function GET(req: Request) {
@@ -34,7 +34,18 @@ export async function GET(req: Request) {
   const { data, error: dbError, count } = await supabaseAdmin
     .from("payments")
     .select(
-      "id, membership_id, member_id, amount, payment_mode, payment_date, receipt_number, created_at",
+      `
+      id,
+      membership_id,
+      member_id,
+      amount,
+      payment_mode,
+      payment_date,
+      receipt_number,
+      email_sent,
+      created_at,
+      members ( full_name, member_code )
+    `,
       { count: "exact" }
     )
     .order("payment_date", { ascending: false })

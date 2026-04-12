@@ -12,7 +12,7 @@ import { internalServerError } from "@/lib/apiError";
 const listQuerySchema = z.object({
   q: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  pageSize: z.coerce.number().int().min(1).max(50).default(25),
   tab: z.enum(["all", "active_membership", "expired", "deactivated"]).optional(),
   is_active: z
     .enum(["true", "false"])
@@ -30,21 +30,27 @@ type MemberRow = {
   photo_url: string | null;
   is_active: boolean;
   created_at: string;
+  welcome_wa_sent: boolean | null;
 };
 
-function buildLatestMembershipMap(
-  rows: Array<{ member_id: string; plan_id: string; end_date: string }>
-) {
-  const latestMembershipMap = new Map<string, { plan_id: string; end_date: string }>();
-  for (const m of rows) {
-    if (!latestMembershipMap.has(String(m.member_id))) {
-      latestMembershipMap.set(String(m.member_id), {
-        plan_id: String(m.plan_id),
-        end_date: String(m.end_date),
-      });
-    }
-  }
-  return latestMembershipMap;
+type MembershipEmbed = {
+  end_date: string;
+  plan_id: string;
+  status: string;
+  plans: { name: string } | null;
+};
+
+type MemberWithMemberships = MemberRow & {
+  memberships: MembershipEmbed[] | null;
+};
+
+function pickLatestNonCancelledMembership(
+  rows: MembershipEmbed[] | null | undefined
+): MembershipEmbed | null {
+  if (!rows?.length) return null;
+  const eligible = rows.filter((r) => r.status !== "cancelled");
+  if (!eligible.length) return null;
+  return eligible.reduce((a, b) => (String(a.end_date) >= String(b.end_date) ? a : b));
 }
 
 export async function GET(req: Request) {
@@ -72,6 +78,7 @@ export async function GET(req: Request) {
   }
 
   const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
   const supabaseAdmin = createSupabaseAdminClient();
 
@@ -82,6 +89,19 @@ export async function GET(req: Request) {
     month: "2-digit",
     day: "2-digit",
   }).format(today);
+
+  const memberSelect = `
+    id,
+    member_code,
+    full_name,
+    mobile,
+    email,
+    photo_url,
+    is_active,
+    created_at,
+    welcome_wa_sent,
+    memberships ( end_date, plan_id, status, plans ( name ) )
+  `;
 
   const { data: allMembershipRows, error: msErr } = await supabaseAdmin
     .from("memberships")
@@ -102,36 +122,40 @@ export async function GET(req: Request) {
     }
   }
 
-  const { data: memberIndex, error: idxErr } = await supabaseAdmin
-    .from("members")
-    .select("id, is_active, created_at");
-
-  if (idxErr) return internalServerError("Failed to load members");
-
-  const indexRows = (memberIndex ?? []) as Array<{ id: string; is_active: boolean; created_at: string }>;
-
-  const tabCounts = {
-    all: 0,
-    active_membership: 0,
-    expired: 0,
-    deactivated: 0,
-  };
-  const activeMemberIds: string[] = [];
-  const deactivatedMemberIds: string[] = [];
-  for (const r of indexRows) {
-    if (r.is_active) {
-      activeMemberIds.push(r.id);
-      tabCounts.all += 1;
-      const latest = latestEndByMember.get(r.id);
-      const end = latest?.end_date;
-      const hasActiveMembership = Boolean(end && end >= todayIST);
-      if (hasActiveMembership) tabCounts.active_membership += 1;
-      else tabCounts.expired += 1;
-    } else {
-      deactivatedMemberIds.push(r.id);
-      tabCounts.deactivated += 1;
-    }
+  const hasCurrentMembershipIds = new Set<string>();
+  for (const [mid, v] of latestEndByMember) {
+    if (v.end_date >= todayIST) hasCurrentMembershipIds.add(mid);
   }
+  const hasCurrentList = [...hasCurrentMembershipIds];
+
+  const { count: allActiveCount } = await supabaseAdmin
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true);
+
+  const { count: deactivatedCount } = await supabaseAdmin
+    .from("members")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", false);
+
+  let activeMembershipTabCount = 0;
+  if (hasCurrentList.length > 0) {
+    const { count } = await supabaseAdmin
+      .from("members")
+      .select("id", { count: "exact", head: true })
+      .eq("is_active", true)
+      .in("id", hasCurrentList);
+    activeMembershipTabCount = count ?? 0;
+  }
+
+  const activeCount = allActiveCount ?? 0;
+  const inCurrent = activeMembershipTabCount;
+  const tabCounts = {
+    all: activeCount,
+    active_membership: inCurrent,
+    expired: Math.max(0, activeCount - inCurrent),
+    deactivated: deactivatedCount ?? 0,
+  };
 
   let expiringIdSet: Set<string> | null = null;
   if (expiring_within_days != null) {
@@ -163,140 +187,100 @@ export async function GET(req: Request) {
     }
   }
 
-  function membershipCategory(memberId: string, isActive: boolean): "active_membership" | "expired" | "deactivated" {
-    if (!isActive) return "deactivated";
-    const latest = latestEndByMember.get(memberId);
-    const end = latest?.end_date;
-    if (end && end >= todayIST) return "active_membership";
-    return "expired";
-  }
-
-  let filteredIds: string[] = [];
-  if (tab === "deactivated") {
-    filteredIds = deactivatedMemberIds;
-  } else if (tab === "all") {
-    filteredIds = activeMemberIds;
-  } else if (tab === "active_membership") {
-    filteredIds = activeMemberIds.filter((id) => membershipCategory(id, true) === "active_membership");
-  } else {
-    filteredIds = activeMemberIds.filter((id) => membershipCategory(id, true) === "expired");
-  }
-
-  if (expiringIdSet) {
-    filteredIds = filteredIds.filter((id) => expiringIdSet!.has(id));
-  }
-
-  const createdAtById = new Map(indexRows.map((r) => [r.id, r.created_at]));
-  filteredIds.sort((a, b) => {
-    const ca = createdAtById.get(a) ?? "";
-    const cb = createdAtById.get(b) ?? "";
-    return cb.localeCompare(ca);
-  });
-
-  let listIds = filteredIds;
-  if (q && q.trim()) {
-    const qq = q.trim();
-    if (filteredIds.length === 0) {
-      listIds = [];
-    } else {
-      const { data: matchRows, error: matchErr } = await supabaseAdmin
-        .from("members")
-        .select("id")
-        .in("id", filteredIds)
-        .or(`full_name.ilike.%${qq}%,mobile.ilike.%${qq}%`);
-      if (matchErr) return internalServerError("Failed to search members");
-      const matchSet = new Set((matchRows ?? []).map((r) => String(r.id)));
-      listIds = filteredIds.filter((id) => matchSet.has(id));
-    }
-  }
-
-  const total = listIds.length;
-  const pageIds = listIds.slice(from, from + pageSize);
-
-  if (pageIds.length === 0) {
+  if (tab === "active_membership" && hasCurrentList.length === 0) {
     return NextResponse.json({
       items: [],
       page,
       pageSize,
-      total,
+      total: 0,
       tab,
       tabCounts,
     });
   }
 
-  const { data: pageRows, error: pageErr } = await supabaseAdmin
+  let listQuery = supabaseAdmin
     .from("members")
-    .select("id, member_code, full_name, mobile, email, photo_url, is_active, created_at")
-    .in("id", pageIds);
+    .select(memberSelect, { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (tab === "deactivated") {
+    listQuery = listQuery.eq("is_active", false);
+  } else {
+    listQuery = listQuery.eq("is_active", true);
+    if (tab === "active_membership") {
+      listQuery = listQuery.in("id", hasCurrentList);
+    } else if (tab === "expired" && hasCurrentList.length > 0) {
+      listQuery = listQuery.not("id", "in", `(${hasCurrentList.join(",")})`);
+    }
+  }
+
+  if (expiringIdSet && expiringIdSet.size > 0) {
+    listQuery = listQuery.in("id", [...expiringIdSet]);
+  }
+
+  const qq = q?.trim();
+  if (qq) {
+    listQuery = listQuery.or(`full_name.ilike.%${qq}%,mobile.ilike.%${qq}%`);
+  }
+
+  const { data: pageRows, error: pageErr, count: listTotal } = await listQuery.range(from, to);
 
   if (pageErr) return internalServerError("Failed to load members");
 
-  const items = (pageRows ?? []) as MemberRow[];
-  const orderIndex = new Map(pageIds.map((id, i) => [id, i]));
-  items.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+  const rows = (pageRows ?? []) as MemberWithMemberships[];
+  const bucket = process.env.SUPABASE_MEMBER_PHOTO_BUCKET || "sm-fitness-member-photo";
 
-  const memberIds = items.map((m) => m.id);
-  const { data: memberships } = memberIds.length
-    ? await supabaseAdmin
-        .from("memberships")
-        .select("member_id, plan_id, end_date, status")
-        .in("member_id", memberIds)
-        .neq("status", "cancelled")
-        .order("end_date", { ascending: false })
-    : { data: [] as Array<{ member_id: string; plan_id: string; end_date: string; status: string }> };
-
-  const planIds = Array.from(new Set((memberships ?? []).map((m) => String(m.plan_id))));
-  const { data: plans } = planIds.length
-    ? await supabaseAdmin.from("plans").select("id, name").in("id", planIds)
-    : { data: [] as Array<{ id: string; name: string }> };
-  const planMap = new Map((plans ?? []).map((p) => [String(p.id), p.name]));
-
-  const latestMembershipMap = buildLatestMembershipMap(
-    (memberships ?? []) as Array<{ member_id: string; plan_id: string; end_date: string }>
+  const items = await Promise.all(
+    rows.map(async (m) => {
+      const latest = pickLatestNonCancelledMembership(m.memberships);
+      const end = latest?.end_date ?? null;
+      let status: "active" | "expiring" | "expired" | "none" = "none";
+      let daysLeft: number | null = null;
+      if (end) {
+        if (end < todayIST) {
+          status = "expired";
+          daysLeft = 0;
+        } else {
+          const diffDays = Math.ceil(
+            (new Date(`${end}T00:00:00+05:30`).getTime() -
+              new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
+              (1000 * 60 * 60 * 24)
+          );
+          daysLeft = diffDays;
+          status = diffDays <= 7 ? "expiring" : "active";
+        }
+      }
+      let photo_signed_url: string | null = null;
+      if (m.photo_url) {
+        const { data: signed } = await supabaseAdmin.storage
+          .from(bucket)
+          .createSignedUrl(String(m.photo_url), 60 * 60);
+        photo_signed_url = signed?.signedUrl ?? null;
+      }
+      return {
+        id: m.id,
+        member_code: m.member_code,
+        full_name: m.full_name,
+        mobile: m.mobile,
+        email: m.email,
+        photo_url: m.photo_url,
+        is_active: m.is_active,
+        created_at: m.created_at,
+        welcome_wa_sent: m.welcome_wa_sent,
+        photo_signed_url,
+        membership_plan_name: latest ? latest.plans?.name ?? "Membership" : null,
+        membership_end_date: end,
+        membership_status: status,
+        membership_days_left: daysLeft,
+      };
+    })
   );
 
   return NextResponse.json({
-    items: await Promise.all(
-      items.map(async (m) => {
-        const latest = latestMembershipMap.get(m.id);
-        const end = latest?.end_date ?? null;
-        let status: "active" | "expiring" | "expired" | "none" = "none";
-        let daysLeft: number | null = null;
-        if (end) {
-          if (end < todayIST) {
-            status = "expired";
-            daysLeft = 0;
-          } else {
-            const diffDays = Math.ceil(
-              (new Date(`${end}T00:00:00+05:30`).getTime() -
-                new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
-                (1000 * 60 * 60 * 24)
-            );
-            daysLeft = diffDays;
-            status = diffDays <= 7 ? "expiring" : "active";
-          }
-        }
-        let photo_signed_url: string | null = null;
-        if (m.photo_url) {
-          const bucket = process.env.SUPABASE_MEMBER_PHOTO_BUCKET || "sm-fitness-member-photo";
-          const { data: signed } = await supabaseAdmin.storage
-            .from(bucket)
-            .createSignedUrl(String(m.photo_url), 60 * 60);
-          photo_signed_url = signed?.signedUrl ?? null;
-        }
-        return {
-          ...m,
-          photo_signed_url,
-          membership_plan_name: latest ? planMap.get(latest.plan_id) ?? "Membership" : null,
-          membership_end_date: end,
-          membership_status: status,
-          membership_days_left: daysLeft,
-        };
-      })
-    ),
+    items,
     page,
     pageSize,
-    total,
+    total: listTotal ?? 0,
     tab,
     tabCounts,
   });

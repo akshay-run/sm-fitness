@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { UPIQRModal } from "@/components/payments/UPIQRModal";
@@ -26,6 +26,7 @@ export function PaymentForm({
   const [upiRef, setUpiRef] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [cashRecording, setCashRecording] = useOptimistic(false, (_prev, next: boolean) => next);
   const [error, setError] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [settingsUpi, setSettingsUpi] = useState<string | null>(null);
@@ -84,6 +85,12 @@ export function PaymentForm({
       return;
     }
 
+    const isCash = parsed.data.payment_mode === "cash";
+    if (isCash) {
+      startTransition(() => {
+        setCashRecording(true);
+      });
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/payments", {
@@ -101,9 +108,17 @@ export function PaymentForm({
       toast.success("Payment recorded");
       onCreated(json.id);
     } catch (err: unknown) {
+      if (isCash) {
+        toast.error("Action failed — please try again");
+      }
       setError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
       setSubmitting(false);
+      if (isCash) {
+        startTransition(() => {
+          setCashRecording(false);
+        });
+      }
     }
   }
 
@@ -131,7 +146,7 @@ export function PaymentForm({
                 ? "bg-zinc-900 text-white"
                 : "border border-zinc-200 hover:bg-zinc-50",
             ].join(" ")}
-            disabled={submitting}
+            disabled={submitting || cashRecording}
           >
             Cash
           </button>
@@ -144,7 +159,7 @@ export function PaymentForm({
                 ? "bg-zinc-900 text-white"
                 : "border border-zinc-200 hover:bg-zinc-50",
             ].join(" ")}
-            disabled={submitting}
+            disabled={submitting || cashRecording}
           >
             UPI (QR)
           </button>
@@ -166,7 +181,7 @@ export function PaymentForm({
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                   value={upiRef}
                   onChange={(e) => setUpiRef(e.target.value)}
-                  disabled={submitting}
+                  disabled={submitting || cashRecording}
                 />
               </div>
               <div className="space-y-1">
@@ -178,7 +193,7 @@ export function PaymentForm({
                   className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  disabled={submitting}
+                  disabled={submitting || cashRecording}
                 />
               </div>
             </div>
@@ -194,7 +209,7 @@ export function PaymentForm({
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                disabled={submitting}
+                disabled={submitting || cashRecording}
               />
             </div>
           </div>
@@ -208,10 +223,14 @@ export function PaymentForm({
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || cashRecording}
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
         >
-          {submitting ? "Saving..." : mode === "upi" ? "Confirm payment" : "Mark as paid"}
+          {submitting || cashRecording
+            ? "Saving..."
+            : mode === "upi"
+              ? "Confirm payment"
+              : "Mark as paid"}
         </button>
       </form>
 

@@ -29,6 +29,7 @@ const memberRow = {
   email: "aman@example.com",
   photo_url: null,
   is_active: true,
+  welcome_wa_sent: false,
   created_at: "2026-01-01T00:00:00Z",
 };
 
@@ -56,12 +57,21 @@ function makeMembersSupabaseMock() {
                   data: [membershipRow],
                   error: null,
                 }),
+              gte: () => ({
+                lte: () => ({
+                  neq: () =>
+                    Promise.resolve({
+                      data: [{ member_id: "member-1" }],
+                      error: null,
+                    }),
+                }),
+              }),
             }),
-            in: () => ({
-              neq: () => ({
-                order: () =>
+            gte: () => ({
+              lte: () => ({
+                neq: () =>
                   Promise.resolve({
-                    data: [membershipRow],
+                    data: [{ member_id: "member-1" }],
                     error: null,
                   }),
               }),
@@ -80,12 +90,61 @@ function makeMembersSupabaseMock() {
       }
       if (table !== "members") throw new Error(`Unexpected table ${table}`);
       return {
-        select: (fields: string) => {
-          if (fields === "id, is_active, created_at") {
-            return Promise.resolve({
-              data: [memberRow],
-              error: null,
-            });
+        select: (fields: string, opts?: { count?: string; head?: boolean }) => {
+          if (opts?.count === "exact" && opts?.head) {
+            return {
+              eq(_c: string, v: boolean) {
+                if (v === false) {
+                  return Promise.resolve({ count: 0, error: null });
+                }
+                return {
+                  in() {
+                    return Promise.resolve({ count: 1, error: null });
+                  },
+                  then(onFulfilled: (v: unknown) => unknown, onRej?: (e: unknown) => unknown) {
+                    return Promise.resolve({ count: 1, error: null }).then(
+                      onFulfilled as (v: unknown) => unknown,
+                      onRej
+                    );
+                  },
+                };
+              },
+            };
+          }
+          if (fields.includes("memberships")) {
+            const rowWithEmbed = {
+              ...memberRow,
+              memberships: [
+                {
+                  end_date: "2099-01-01",
+                  plan_id: "plan-1",
+                  status: "active",
+                  plans: { name: "Monthly" },
+                },
+              ],
+            };
+            const afterEq = {
+              not() {
+                return afterEq;
+              },
+              in() {
+                return afterEq;
+              },
+              or() {
+                return afterEq;
+              },
+              range: () =>
+                Promise.resolve({
+                  data: [rowWithEmbed],
+                  count: 1,
+                  error: null,
+                }),
+            };
+            return {
+              order: () => ({
+                eq: () => afterEq,
+              }),
+            };
           }
           if (fields === "id") {
             return {
@@ -138,7 +197,7 @@ describe("members route", () => {
 
   it("GET returns paginated members", async () => {
     const { GET } = await import("@/app/api/members/route");
-    const req = new Request("http://localhost/api/members?page=1&pageSize=20&tab=all");
+    const req = new Request("http://localhost/api/members?page=1&pageSize=25&tab=all");
     const res = await GET(req);
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -193,7 +252,7 @@ describe("members route", () => {
     });
 
     const { GET } = await import("@/app/api/members/route");
-    const req = new Request("http://localhost/api/members?page=1&pageSize=20");
+    const req = new Request("http://localhost/api/members?page=1&pageSize=25");
     const res = await GET(req);
     expect(res.status).toBe(401);
   });

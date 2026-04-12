@@ -9,6 +9,9 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/forgot-password")) return NextResponse.next();
   if (pathname.startsWith("/update-password")) return NextResponse.next();
   if (pathname.startsWith("/api/cron")) return NextResponse.next();
+  if (pathname === "/manifest.json" || pathname.startsWith("/icons/")) {
+    return NextResponse.next();
+  }
 
   const res = NextResponse.next();
   const supabase = createSupabaseMiddlewareClient(req, res);
@@ -28,7 +31,14 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|.*\\.(?:png|jpg|jpeg|gif|webp|svg)$).*)",
+    /*
+     * Match all request paths EXCEPT:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico
+     * - Image file extensions
+     * - Public folder files (via extensions above)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|otf)$).*)",
   ],
 };
-

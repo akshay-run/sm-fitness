@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useState, startTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { formatDateShortIST } from "@/lib/uiFormat";
@@ -64,11 +64,15 @@ export default function MembersPage() {
   const emptyData: MemberListResponse = {
     items: [],
     page: 1,
-    pageSize: 20,
+    pageSize: 25,
     total: 0,
     tabCounts: { all: 0, active_membership: 0, expired: 0, deactivated: 0 },
   };
   const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
+  const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(
+    null,
+    (_prev, id: string | null) => id
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +97,7 @@ export default function MembersPage() {
   const queryString = useMemo(() => {
     const sp = new URLSearchParams();
     sp.set("page", String(Math.max(1, page)));
-    sp.set("pageSize", "20");
+    sp.set("pageSize", "25");
     sp.set("tab", tab);
     if (q) sp.set("q", q);
     if (expiring_within_days) sp.set("expiring_within_days", expiring_within_days);
@@ -118,7 +122,12 @@ export default function MembersPage() {
   const error = queryError instanceof Error ? queryError.message : null;
   const tabCounts = data.tabCounts ?? emptyData.tabCounts!;
 
-  const totalPages = Math.max(1, Math.ceil((data.total ?? 0) / (data.pageSize ?? 20)));
+  const visibleMembers = useMemo(
+    () => data.items.filter((m) => m.id !== hiddenReactivateId),
+    [data.items, hiddenReactivateId]
+  );
+
+  const totalPages = Math.max(1, Math.ceil((data.total ?? 0) / (data.pageSize ?? 25)));
 
   function reminderForMember(m: MemberListItem) {
     const end = m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "";
@@ -158,6 +167,7 @@ export default function MembersPage() {
         next.expiring_within_days !== undefined ? next.expiring_within_days : expiring_within_days;
       if (nq) sp.set("q", nq);
       sp.set("page", String(Math.max(1, np)));
+      sp.set("pageSize", "25");
       sp.set("tab", nt);
       if (ne) sp.set("expiring_within_days", ne);
       router.push(`${pathname}?${sp.toString()}`);
@@ -175,19 +185,35 @@ export default function MembersPage() {
   }, [inputQ, navigate, q]);
 
   async function reactivateMember(m: MemberListItem) {
-    const res = await fetch(`/api/members/${m.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ is_active: true }),
+    startTransition(() => {
+      setHiddenReactivateId(m.id);
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(json?.error ?? "Failed to reactivate");
-      return;
+    try {
+      const res = await fetch(`/api/members/${m.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        startTransition(() => {
+          setHiddenReactivateId(null);
+        });
+        toast.error(json?.error ?? "Action failed — please try again");
+        return;
+      }
+      startTransition(() => {
+        setHiddenReactivateId(null);
+      });
+      toast.success("Member reactivated ✓");
+      await queryClient.invalidateQueries({ queryKey: ["members"] });
+      navigate({ tab: "all", page: 1 });
+    } catch {
+      startTransition(() => {
+        setHiddenReactivateId(null);
+      });
+      toast.error("Action failed — please try again");
     }
-    toast.success("Member reactivated ✓");
-    await queryClient.invalidateQueries({ queryKey: ["members"] });
-    navigate({ tab: "all", page: 1 });
   }
 
   return (
@@ -257,8 +283,12 @@ export default function MembersPage() {
           </>
         ) : error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        ) : data.items.length ? (
-          data.items.map((m) => (
+        ) : data.items.length === 0 ? (
+          <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+            No members found.
+          </div>
+        ) : visibleMembers.length ? (
+          visibleMembers.map((m) => (
             <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -334,7 +364,7 @@ export default function MembersPage() {
           ))
         ) : (
           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-            No members found.
+            Updating…
           </div>
         )}
       </div>
