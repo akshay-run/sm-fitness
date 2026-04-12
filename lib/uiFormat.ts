@@ -49,8 +49,8 @@ export function formatAmountINR(value: number | string) {
 }
 
 /**
- * INR formatted with ASCII-only prefix for PDF generators (jsPDF Helvetica)
- * that do not embed Unicode fonts — avoids garbled rupee symbols.
+ * INR with ₹ for PDF output. Use with embedded Unicode font (e.g. Noto Sans in jsPDF);
+ * if the PDF falls back to Helvetica, use an ASCII formatter instead.
  */
 export function formatAmountPdfINR(value: number | string): string {
   const n = Number(value || 0);

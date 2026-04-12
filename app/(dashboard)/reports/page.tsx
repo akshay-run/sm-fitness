@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { CellHookData } from "jspdf-autotable";
 import {
   formatAmountINR,
   formatAmountPdfINR,
@@ -19,6 +20,15 @@ import {
   toTitleCase,
 } from "@/lib/uiFormat";
 import type { ReportScope } from "@/lib/dateUtils";
+
+const PDF_MARGIN = 40;
+const PDF_CONTENT_W = 515;
+const PDF_HEADER_RGB: [number, number, number] = [26, 26, 46];
+const PDF_CELL_PAD = { top: 4, right: 8, bottom: 4, left: 8 };
+/** Payment table column widths (pt); total = 515. */
+const PAY_COL_W = { member: 110, mobile: 85, date: 65, plan: 80, amount: 90, mode: 85 };
+/** Plan summary table (pt); total = 515. */
+const PLAN_COL_W = { plan: 145, members: 90, payments: 90, revenue: 115, avg: 75 };
 
 const SCOPE_OPTIONS: { value: ReportScope; label: string }[] = [
   { value: "this_month", label: "This month" },
@@ -56,6 +66,47 @@ type SummaryJson = {
   }>;
   member_growth: Array<{ month: string; total_members: number }>;
 };
+
+type DocWithVfs = jsPDF & { addFileToVFS: (filename: string, data: string) => void };
+
+function binaryStringFromBuffer(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return s;
+}
+
+async function embedNotoSans(doc: jsPDF): Promise<boolean> {
+  try {
+    const [regRes, boldRes] = await Promise.all([
+      fetch("/fonts/NotoSans-Regular.ttf"),
+      fetch("/fonts/NotoSans-Bold.ttf"),
+    ]);
+    if (!regRes.ok || !boldRes.ok) return false;
+    const [regBuf, boldBuf] = await Promise.all([regRes.arrayBuffer(), boldRes.arrayBuffer()]);
+    const vfs = doc as DocWithVfs;
+    vfs.addFileToVFS("NotoSans-Regular.ttf", binaryStringFromBuffer(regBuf));
+    vfs.addFileToVFS("NotoSans-Bold.ttf", binaryStringFromBuffer(boldBuf));
+    doc.addFont("NotoSans-Regular.ttf", "NotoSans", "normal", undefined, "Identity-H");
+    doc.addFont("NotoSans-Bold.ttf", "NotoSans", "bold", undefined, "Identity-H");
+    doc.setFont("NotoSans", "normal");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function formatAmountPdfAscii(value: number | string): string {
+  const n = Number(value || 0);
+  const s = n.toLocaleString("en-IN", { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+  return `Rs. ${s}`;
+}
+
+function stripeBodyRow(data: CellHookData) {
+  if (data.section !== "body") return;
+  data.cell.styles.fillColor =
+    data.row.index % 2 === 1 ? ([248, 249, 250] as [number, number, number]) : ([255, 255, 255] as [number, number, number]);
+}
 
 export default function ReportsPage() {
   const [scope, setScope] = useState<ReportScope>("this_month");
@@ -95,11 +146,20 @@ export default function ReportsPage() {
     return `${a} to ${b}`;
   }, [data]);
 
-  function exportPdf() {
+  const exportPdf = useCallback(async () => {
     if (!data) return;
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-    const margin = 40;
+    const margin = PDF_MARGIN;
     const pageW = doc.internal.pageSize.getWidth();
+
+    const notoOk = await embedNotoSans(doc);
+    const tableFont = notoOk ? "NotoSans" : "helvetica";
+    const pdfAmount = (v: number | string) => (notoOk ? formatAmountPdfINR(v) : formatAmountPdfAscii(v));
+
+    const setDocFont = (style: "normal" | "bold") => {
+      if (notoOk) doc.setFont("NotoSans", style);
+      else doc.setFont("helvetica", style);
+    };
 
     const scopeTitle = SCOPE_OPTIONS.find((o) => o.value === data.scope)?.label ?? data.scope;
     const periodLine =
@@ -113,10 +173,10 @@ export default function ReportsPage() {
       timeStyle: "short",
     })} IST`;
 
-    doc.setFont("helvetica", "bold");
+    setDocFont("bold");
     doc.setFontSize(16);
     doc.text(gymName, margin, 50);
-    doc.setFont("helvetica", "normal");
+    setDocFont("normal");
     doc.setFontSize(11);
     doc.text("Payment report", margin, 68);
     doc.setFontSize(9);
@@ -128,56 +188,90 @@ export default function ReportsPage() {
 
     autoTable(doc, {
       startY: 128,
+      theme: "plain",
       head: [["Metric", "Value"]],
       body: [
         ["Payments (count)", String(data.summary.payment_count)],
-        ["Cash total", formatAmountPdfINR(data.summary.cash_total)],
-        ["UPI total", formatAmountPdfINR(data.summary.upi_total)],
-        ["Grand total", formatAmountPdfINR(data.summary.grand_total)],
+        ["Cash total", pdfAmount(data.summary.cash_total)],
+        ["UPI total", pdfAmount(data.summary.upi_total)],
+        ["Grand total", pdfAmount(data.summary.grand_total)],
         ["New members in period", String(data.summary.new_members)],
       ],
-      styles: { font: "helvetica", fontSize: 9, cellPadding: 6 },
-      headStyles: { fillColor: [24, 24, 27], textColor: 255, fontStyle: "bold" },
-      columnStyles: {
-        0: { cellWidth: (pageW - margin * 2) * 0.55 },
-        1: { halign: "right", fontStyle: "bold" },
+      styles: {
+        font: tableFont,
+        fontSize: 9,
+        cellPadding: PDF_CELL_PAD,
+        textColor: [0, 0, 0],
+        fillColor: [255, 255, 255],
       },
-      theme: "striped",
-      tableWidth: pageW - margin * 2,
+      headStyles: {
+        font: tableFont,
+        fontStyle: "bold",
+        fontSize: 9,
+        fillColor: PDF_HEADER_RGB,
+        textColor: 255,
+        cellPadding: PDF_CELL_PAD,
+      },
+      columnStyles: {
+        0: { cellWidth: 283 },
+        1: { cellWidth: 232, halign: "right", fontStyle: "bold" },
+      },
+      didParseCell: (hook) => {
+        stripeBodyRow(hook);
+        if (hook.section === "body" && hook.column.index === 1) {
+          hook.cell.styles.halign = "right";
+          hook.cell.styles.fontStyle = "bold";
+        }
+      },
+      tableWidth: PDF_CONTENT_W,
       margin: { left: margin, right: margin },
     });
 
     let yAfter =
       (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-    const tableInnerW = pageW - margin * 2;
     autoTable(doc, {
       startY: yAfter,
-      head: [["Member", "Mobile", "Date", "Plan", "Amount (INR)", "Mode"]],
+      theme: "plain",
+      head: [["Member", "Mobile", "Date", "Plan", "Amount", "Mode"]],
       body: data.payments.map((p) => [
         toTitleCase(p.member_name),
         p.member_mobile || "—",
         formatDateShortIST(p.payment_date),
         p.plan_name,
-        formatAmountPdfINR(p.amount),
+        pdfAmount(p.amount),
         p.mode.toUpperCase(),
       ]),
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 4 },
-      headStyles: { fillColor: [24, 24, 27], textColor: 255, fontStyle: "bold" },
+      styles: {
+        font: tableFont,
+        fontSize: 8,
+        cellPadding: PDF_CELL_PAD,
+        textColor: [0, 0, 0],
+        fillColor: [255, 255, 255],
+      },
+      headStyles: {
+        font: tableFont,
+        fontStyle: "bold",
+        fontSize: 8,
+        fillColor: PDF_HEADER_RGB,
+        textColor: 255,
+        cellPadding: PDF_CELL_PAD,
+      },
       columnStyles: {
-        0: { cellWidth: tableInnerW * 0.22 },
-        1: { cellWidth: tableInnerW * 0.16 },
-        2: { cellWidth: tableInnerW * 0.14 },
-        3: { cellWidth: tableInnerW * 0.16 },
-        4: { cellWidth: tableInnerW * 0.16, halign: "right" },
-        5: { cellWidth: tableInnerW * 0.16 },
+        0: { cellWidth: PAY_COL_W.member, halign: "left" },
+        1: { cellWidth: PAY_COL_W.mobile, halign: "left" },
+        2: { cellWidth: PAY_COL_W.date, halign: "left" },
+        3: { cellWidth: PAY_COL_W.plan, halign: "left" },
+        4: { cellWidth: PAY_COL_W.amount, halign: "right" },
+        5: { cellWidth: PAY_COL_W.mode, halign: "left" },
       },
       didParseCell: (hook) => {
-        if (hook.section === "head" && hook.column.index === 4) {
-          hook.cell.styles.halign = "right";
-        }
+        stripeBodyRow(hook);
+        if (hook.section === "head" && hook.column.index === 4) hook.cell.styles.halign = "right";
+        if (hook.section === "body" && hook.column.index === 4) hook.cell.styles.halign = "right";
+        if (hook.section === "body" && hook.column.index === 5) hook.cell.styles.halign = "left";
       },
-      tableWidth: tableInnerW,
+      tableWidth: PDF_CONTENT_W,
       margin: { left: margin, right: margin },
     });
 
@@ -189,10 +283,8 @@ export default function ReportsPage() {
         r.plan_name,
         String(r.member_count),
         String(r.payment_count),
-        formatAmountPdfINR(r.revenue),
-        r.member_count > 0
-          ? formatAmountPdfINR(r.revenue / r.member_count)
-          : "—",
+        pdfAmount(r.revenue),
+        r.member_count > 0 ? pdfAmount(r.revenue / r.member_count) : "—",
       ]);
       const totalMembers = data.plan_breakdown.reduce((s, r) => s + r.member_count, 0);
       const totalPayments = data.plan_breakdown.reduce((s, r) => s + r.payment_count, 0);
@@ -201,30 +293,51 @@ export default function ReportsPage() {
         "Total",
         String(totalMembers),
         String(totalPayments),
-        formatAmountPdfINR(totalRevenue),
-        totalMembers > 0 ? formatAmountPdfINR(totalRevenue / totalMembers) : "—",
+        pdfAmount(totalRevenue),
+        totalMembers > 0 ? pdfAmount(totalRevenue / totalMembers) : "—",
       ]);
       const lastPlanRowIndex = planBody.length - 1;
 
       autoTable(doc, {
         startY: yAfter,
+        theme: "plain",
         head: [["Plan", "Members", "Payments", "Revenue (INR)", "Avg Fee"]],
         body: planBody,
-        styles: { font: "helvetica", fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [24, 24, 27], textColor: 255, fontStyle: "bold" },
+        styles: {
+          font: tableFont,
+          fontSize: 8,
+          cellPadding: PDF_CELL_PAD,
+          textColor: [0, 0, 0],
+          fillColor: [255, 255, 255],
+        },
+        headStyles: {
+          font: tableFont,
+          fontStyle: "bold",
+          fontSize: 8,
+          fillColor: PDF_HEADER_RGB,
+          textColor: 255,
+          cellPadding: PDF_CELL_PAD,
+        },
         columnStyles: {
-          3: { halign: "right" },
-          4: { halign: "right" },
+          0: { cellWidth: PLAN_COL_W.plan, halign: "left" },
+          1: { cellWidth: PLAN_COL_W.members, halign: "left" },
+          2: { cellWidth: PLAN_COL_W.payments, halign: "left" },
+          3: { cellWidth: PLAN_COL_W.revenue, halign: "right" },
+          4: { cellWidth: PLAN_COL_W.avg, halign: "right" },
         },
         didParseCell: (hook) => {
+          stripeBodyRow(hook);
           if (hook.section === "head" && (hook.column.index === 3 || hook.column.index === 4)) {
             hook.cell.styles.halign = "right";
           }
+          if (hook.section === "body" && hook.column.index === 3) hook.cell.styles.halign = "right";
+          if (hook.section === "body" && hook.column.index === 4) hook.cell.styles.halign = "right";
           if (hook.section === "body" && hook.row.index === lastPlanRowIndex) {
             hook.cell.styles.fontStyle = "bold";
+            hook.cell.styles.fillColor = [255, 255, 255];
           }
         },
-        tableWidth: tableInnerW,
+        tableWidth: PDF_CONTENT_W,
         margin: { left: margin, right: margin },
       });
     }
@@ -235,7 +348,7 @@ export default function ReportsPage() {
       `SM FITNESS | Generated by SM FITNESS Admin App | Page ${i} of ${totalPages}`;
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFont("helvetica", "normal");
+      setDocFont("normal");
       doc.setFontSize(7);
       doc.setTextColor(110, 110, 110);
       doc.text(footerText(i), margin, pageH - 16, {
@@ -245,7 +358,7 @@ export default function ReportsPage() {
     }
 
     doc.save(`sm-fitness-report-${scope}.pdf`);
-  }
+  }, [data, gymName, scope]);
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
@@ -259,7 +372,7 @@ export default function ReportsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={exportPdf}
+            onClick={() => void exportPdf()}
             disabled={!data || loading}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >
@@ -315,10 +428,11 @@ export default function ReportsPage() {
               <EmptyState title="No payments" message="No payments in this period." />
             ) : (
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[640px] text-left text-sm">
+                <table className="w-full min-w-[720px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-zinc-200 text-xs font-medium text-zinc-500">
                       <th className="py-2 pr-2">Member</th>
+                      <th className="py-2 pr-2">Mobile</th>
                       <th className="py-2 pr-2">Date</th>
                       <th className="py-2 pr-2">Plan</th>
                       <th className="py-2 pr-2">Amount</th>
@@ -329,6 +443,7 @@ export default function ReportsPage() {
                     {data.payments.map((p) => (
                       <tr key={p.id} className="border-b border-zinc-100">
                         <td className="py-2 pr-2 font-medium">{p.member_name}</td>
+                        <td className="py-2 pr-2 text-zinc-600">{p.member_mobile || "—"}</td>
                         <td className="py-2 pr-2 text-zinc-600">
                           {formatDateShortIST(p.payment_date)}
                         </td>

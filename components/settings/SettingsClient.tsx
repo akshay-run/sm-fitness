@@ -16,6 +16,14 @@ type SettingsPayload = {
   upi_qr_path: string | null;
 };
 
+const cardClass =
+  "mb-6 rounded-[12px] border border-[#E2E8F0] bg-white p-5 shadow-none";
+const sectionTitleClass =
+  "mb-4 border-b border-[#E2E8F0] pb-2 text-sm font-semibold text-[#1A1A2E]";
+const fieldLabelClass = "text-sm font-medium text-zinc-800";
+const inputClass = "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm";
+const hintClass = "text-xs text-zinc-500";
+
 export function SettingsClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,7 +79,7 @@ export function SettingsClient() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Save failed");
-      toast.success("Settings saved");
+      toast.success("Settings saved ✓");
       setLogoUrl(json.logo_signed_url ?? null);
       setQrUrl(json.upi_qr_signed_url ?? null);
     } catch (e: unknown) {
@@ -108,76 +116,154 @@ export function SettingsClient() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl p-4 md:p-6">
+    <div className="mx-auto w-full max-w-2xl p-4 pb-28 md:p-6 md:pb-32">
       <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Settings</h1>
       <p className="mt-1 text-sm text-zinc-600">
         Gym details, UPI, and branding used on receipts and payment screens.
       </p>
 
-      <form onSubmit={saveText} className="card-surface mt-6 space-y-4 rounded-2xl border border-zinc-200 bg-white p-6">
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800" htmlFor="gym_name">
-            Gym name
-          </label>
-          <input
-            id="gym_name"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            value={gymName}
-            onChange={(e) => setGymName(e.target.value)}
-            required
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800" htmlFor="address">
-            Address
-          </label>
-          <textarea
-            id="address"
-            rows={3}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800" htmlFor="phone">
-            Phone
-          </label>
-          <input
-            id="phone"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-zinc-800" htmlFor="upi_id">
-            UPI ID
-          </label>
-          <input
-            id="upi_id"
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            value={upiId}
-            onChange={(e) => setUpiId(e.target.value)}
-            placeholder="name@bank"
-          />
-        </div>
-
-        <div className="border-t border-zinc-100 pt-6">
-          <h2 className="text-sm font-semibold text-zinc-900">Notifications &amp; Backup</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Backup reports and WhatsApp onboarding use these values.
-          </p>
-          <div className="mt-4 space-y-4">
+      <form onSubmit={saveText} className="mt-6 space-y-0">
+        <section className={cardClass} aria-labelledby="settings-gym-profile">
+          <h2 id="settings-gym-profile" className={sectionTitleClass}>
+            Gym Profile
+          </h2>
+          <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-800" htmlFor="backup_email">
+              <label className={fieldLabelClass} htmlFor="gym_name">
+                Gym name
+              </label>
+              <input
+                id="gym_name"
+                className={inputClass}
+                value={gymName}
+                onChange={(e) => setGymName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={fieldLabelClass} htmlFor="address">
+                Address
+              </label>
+              <textarea
+                id="address"
+                rows={3}
+                className={inputClass}
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={fieldLabelClass} htmlFor="phone">
+                Phone
+              </label>
+              <input
+                id="phone"
+                className={inputClass}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className={cardClass} aria-labelledby="settings-payment">
+          <h2 id="settings-payment" className={sectionTitleClass}>
+            Payment Details
+          </h2>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className={fieldLabelClass} htmlFor="upi_id">
+                UPI ID
+              </label>
+              <input
+                id="upi_id"
+                className={inputClass}
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="name@bank"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className={fieldLabelClass}>UPI QR image</div>
+              <p className={hintClass}>Uploaded QR is shown when recording UPI payments.</p>
+              {qrUrl ? (
+                <div className="flex justify-center py-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrUrl}
+                    alt="UPI QR"
+                    className="max-h-[120px] w-auto object-contain"
+                  />
+                </div>
+              ) : null}
+              <div>
+                <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+                  Choose File
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) void uploadQr(f).catch((err) => toast.error(String(err)));
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className={cardClass} aria-labelledby="settings-branding">
+          <h2 id="settings-branding" className={sectionTitleClass}>
+            Branding
+          </h2>
+          <div className="space-y-2">
+            <div className={fieldLabelClass}>Logo</div>
+            <p className={hintClass}>PNG/JPG/WebP, max 2MB. Shown on receipts.</p>
+            {logoUrl ? (
+              <div className="py-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logoUrl}
+                  alt="Gym logo"
+                  className="h-[60px] w-[60px] rounded-lg object-contain"
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+                Choose File
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) void uploadLogo(f).catch((err) => toast.error(String(err)));
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section className={cardClass} aria-labelledby="settings-notify">
+          <h2 id="settings-notify" className={sectionTitleClass}>
+            Notifications &amp; Backup
+          </h2>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className={fieldLabelClass} htmlFor="backup_email">
                 Backup email address
               </label>
-              <p className="text-xs text-zinc-500">Member backup report is sent here every 5 days</p>
+              <p className={hintClass}>Member backup report sent here every 5 days</p>
               <input
                 id="backup_email"
                 type="email"
-                className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                className={inputClass}
                 value={backupEmail}
                 onChange={(e) => setBackupEmail(e.target.value)}
                 placeholder="owner.backup@gmail.com"
@@ -185,15 +271,15 @@ export function SettingsClient() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium text-zinc-800" htmlFor="whatsapp_group_link">
+              <label className={fieldLabelClass} htmlFor="whatsapp_group_link">
                 Gym WhatsApp group link
               </label>
-              <p className="text-xs text-zinc-500">Shared with new members in welcome message</p>
+              <p className={hintClass}>Shared with new members in welcome message</p>
               <div className="flex flex-wrap items-stretch gap-2">
                 <input
                   id="whatsapp_group_link"
                   type="url"
-                  className="min-w-0 flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className={`${inputClass} min-w-0 flex-1`}
                   value={whatsappGroupLink}
                   onChange={(e) => setWhatsappGroupLink(e.target.value)}
                   placeholder="https://chat.whatsapp.com/..."
@@ -210,52 +296,17 @@ export function SettingsClient() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 gap-6 border-t border-zinc-100 pt-4 sm:grid-cols-2">
-          <div>
-            <div className="text-sm font-medium text-zinc-800">Logo</div>
-            <p className="mt-1 text-xs text-zinc-500">Shown on receipts. PNG/JPG/WebP, max 2MB.</p>
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="Gym logo" className="mt-2 h-20 w-auto object-contain" />
-            ) : null}
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-2 text-sm"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void uploadLogo(f).catch((err) => toast.error(String(err)));
-              }}
-            />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-zinc-800">UPI QR image</div>
-            <p className="mt-1 text-xs text-zinc-500">Uploaded QR is shown when recording UPI payments.</p>
-            {qrUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrUrl} alt="UPI QR" className="mt-2 h-32 w-32 object-contain" />
-            ) : null}
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-2 text-sm"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void uploadQr(f).catch((err) => toast.error(String(err)));
-              }}
-            />
-          </div>
+        <div className="sticky bottom-4 z-10 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full rounded-lg bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
       </form>
     </div>
   );
