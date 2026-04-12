@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { differenceInDays, format } from "date-fns";
 import { z } from "zod";
+import { addDaysIST, addMonthsIST, todayISTDateString } from "@/lib/dateUtils";
 
 const schema = z.object({
   plan_id: z.string().uuid("Select a plan"),
@@ -16,10 +18,12 @@ type Plan = { id: string; name: string; duration_months: number; default_price?:
 export function MembershipForm({
   memberId,
   plans,
+  latestActiveEndDate,
   onCreated,
 }: {
   memberId: string;
   plans: Plan[];
+  latestActiveEndDate: string | null;
   onCreated: (created: { id: string; start_date: string; end_date: string }) => void;
 }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
@@ -32,6 +36,21 @@ export function MembershipForm({
     () => plans.find((p) => p.id === planId) ?? null,
     [plans, planId]
   );
+
+  const previewDates = useMemo(() => {
+    if (!selected) return null;
+    const startStr = latestActiveEndDate ? addDaysIST(latestActiveEndDate, 1) : todayISTDateString();
+    const endStr = addMonthsIST(startStr, selected.duration_months);
+    return { startStr, endStr };
+  }, [latestActiveEndDate, selected]);
+
+  const previewLine = useMemo(() => {
+    if (!previewDates) return null;
+    const start = new Date(`${previewDates.startStr}T12:00:00+05:30`);
+    const end = new Date(`${previewDates.endStr}T12:00:00+05:30`);
+    const durationDays = differenceInDays(end, start);
+    return `Membership will run from ${format(start, "d MMM yyyy")} to ${format(end, "d MMM yyyy")} (${durationDays} days)`;
+  }, [previewDates]);
 
   useEffect(() => {
     if (!planId && plans[0]?.id) setPlanId(plans[0].id);
@@ -52,6 +71,11 @@ export function MembershipForm({
     const parsed = schema.safeParse({ plan_id: planId, fee_charged: fee });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      return;
+    }
+
+    if (previewDates && previewDates.endStr <= previewDates.startStr) {
+      setError("Invalid dates — please contact support");
       return;
     }
 
@@ -127,6 +151,10 @@ export function MembershipForm({
         </div>
       </div>
 
+      {selected && previewLine ? (
+        <p className="text-sm italic text-slate-500">{previewLine}</p>
+      ) : null}
+
       {selected ? (
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
           Dates are auto-calculated based on existing active membership (if any).
@@ -155,4 +183,3 @@ export function MembershipForm({
     </form>
   );
 }
-

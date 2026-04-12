@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { hasSentEmail, sendAndLog, type EmailType } from "@/lib/email";
+import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 
 // Member-scoped sends only. System "backup" digest is sent from /api/cron/backup (logged with type backup).
 const schema = z.object({
@@ -31,6 +32,24 @@ export async function POST(req: Request) {
   const supabaseAdmin = createSupabaseAdminClient();
   const type = parsed.data.type as EmailType;
 
+  const { data: memberRow } = await supabaseAdmin
+    .from("members")
+    .select("id, full_name, email")
+    .eq("id", parsed.data.member_id)
+    .single();
+
+  if (!memberRow) {
+    return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  const manualGuard = skipMemberEmailIfNoAddress({
+    full_name: memberRow.full_name,
+    email: memberRow.email,
+  });
+  if (manualGuard.skipped) {
+    return NextResponse.json({ skipped: true });
+  }
+
   if (!parsed.data.allow_duplicate) {
     const already = await hasSentEmail({
       supabaseAdmin,
@@ -47,7 +66,7 @@ export async function POST(req: Request) {
     supabaseAdmin,
     member_id: parsed.data.member_id,
     type,
-    to: parsed.data.to,
+    to: manualGuard.to,
     subject: parsed.data.subject,
     html: parsed.data.html,
     membership_id: parsed.data.membership_id ?? null,

@@ -13,6 +13,26 @@ describe("validation schemas", () => {
     expect(ok.success).toBe(true);
   });
 
+  it("allows empty optional email on member", () => {
+    const ok = createMemberSchema.safeParse({
+      full_name: "Aman Sharma",
+      mobile: "9876543210",
+      email: "",
+      joining_date: "2026-01-15",
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("rejects invalid member email format when provided", () => {
+    const bad = createMemberSchema.safeParse({
+      full_name: "Aman Sharma",
+      mobile: "9876543210",
+      email: "not-an-email",
+      joining_date: "2026-01-15",
+    });
+    expect(bad.success).toBe(false);
+  });
+
   it("rejects invalid member mobile", () => {
     const bad = createMemberSchema.safeParse({
       full_name: "Aman",

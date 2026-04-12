@@ -31,6 +31,7 @@ export function PlansManager() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [months, setMonths] = useState("1");
+  const [monthsError, setMonthsError] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -54,6 +55,16 @@ export function PlansManager() {
 
   async function addPlan(e: React.FormEvent) {
     e.preventDefault();
+    const m = Number(months);
+    if (!Number.isFinite(m) || m < 1) {
+      setMonthsError("Plan duration must be at least 1 month");
+      return;
+    }
+    if (m > 36) {
+      setMonthsError("Plan duration cannot exceed 36 months");
+      return;
+    }
+    setMonthsError(null);
     const dp = price.trim() === "" ? null : Number(price);
     if (price.trim() !== "" && Number.isNaN(dp)) {
       toast.error("Invalid fee");
@@ -65,7 +76,7 @@ export function PlansManager() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          duration_months: Number(months),
+          duration_months: m,
           default_price: dp,
         }),
       });
@@ -82,6 +93,15 @@ export function PlansManager() {
   }
 
   async function saveEdit(p: PlanRow) {
+    const dm = p.duration_months;
+    if (!Number.isFinite(dm) || dm < 1) {
+      toast.error("Plan duration must be at least 1 month");
+      return;
+    }
+    if (dm > 36) {
+      toast.error("Plan duration cannot exceed 36 months");
+      return;
+    }
     const dp = p.default_price;
     try {
       const res = await fetch(`/api/plans/${p.id}`, {
@@ -137,15 +157,30 @@ export function PlansManager() {
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <input
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            type="number"
-            min={1}
-            placeholder="Months"
-            value={months}
-            onChange={(e) => setMonths(e.target.value)}
-            required
-          />
+          <div className="space-y-1">
+            <input
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+              type="number"
+              min={1}
+              max={36}
+              placeholder="Months"
+              value={months}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMonths(v);
+                const n = Number(v);
+                if (v !== "" && Number.isFinite(n) && n < 1) {
+                  setMonthsError("Plan duration must be at least 1 month");
+                } else if (Number.isFinite(n) && n > 36) {
+                  setMonthsError("Plan duration cannot exceed 36 months");
+                } else {
+                  setMonthsError(null);
+                }
+              }}
+              required
+            />
+            {monthsError ? <p className="text-xs text-red-600">{monthsError}</p> : null}
+          </div>
           <input
             className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
             type="number"
@@ -239,6 +274,7 @@ function PlanRowItem({
           <input
             type="number"
             min={1}
+            max={36}
             className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
             value={draft.duration_months}
             onChange={(e) => setDraft({ ...draft, duration_months: Number(e.target.value) })}
@@ -285,6 +321,7 @@ function PlanRowItem({
             <input
               type="number"
               min={1}
+              max={36}
               className="w-full rounded border border-zinc-200 px-2 py-1 text-sm"
               value={draft.duration_months}
               onChange={(e) => setDraft({ ...draft, duration_months: Number(e.target.value) })}

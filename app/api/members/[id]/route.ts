@@ -57,6 +57,20 @@ export async function GET(
     .limit(1)
     .maybeSingle();
 
+  const { data: activeMembershipsForPreview } = await supabaseAdmin
+    .from("memberships")
+    .select("end_date")
+    .eq("member_id", parsedParams.data.id)
+    .neq("status", "cancelled")
+    .gte("end_date", todayIST)
+    .order("end_date", { ascending: false })
+    .limit(1);
+
+  const latest_active_end_date =
+    activeMembershipsForPreview?.[0]?.end_date != null
+      ? String(activeMembershipsForPreview[0].end_date)
+      : null;
+
   const { data: plan } = latestMembership?.plan_id
     ? await supabaseAdmin
         .from("plans")
@@ -139,6 +153,7 @@ export async function GET(
           days_left: 0,
         },
     recentPayments: recentPayments ?? [],
+    latest_active_end_date,
   });
 }
 
@@ -177,6 +192,7 @@ export async function PATCH(
   if (src.notes !== undefined) patch.notes = src.notes === "" ? null : src.notes;
   if (src.joining_date !== undefined) patch.joining_date = src.joining_date === "" ? null : src.joining_date;
   if (src.welcome_wa_sent !== undefined) patch.welcome_wa_sent = src.welcome_wa_sent;
+  if (src.is_active !== undefined) patch.is_active = src.is_active;
 
   const { data, error: dbError } = await supabaseAdmin
     .from("members")

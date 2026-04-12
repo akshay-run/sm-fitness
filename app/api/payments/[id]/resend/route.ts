@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { sendAndLog } from "@/lib/email";
+import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 
@@ -48,8 +49,16 @@ export async function POST(
     .eq("id", payment.member_id)
     .single();
 
-  if (!member?.email) {
-    return NextResponse.json({ error: "Member has no email address" }, { status: 400 });
+  if (!member) {
+    return NextResponse.json({ error: "Member not found" }, { status: 404 });
+  }
+
+  const resendGuard = skipMemberEmailIfNoAddress({
+    full_name: member.full_name,
+    email: member.email,
+  });
+  if (resendGuard.skipped) {
+    return NextResponse.json({ skipped: true });
   }
 
   const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
@@ -68,7 +77,7 @@ export async function POST(
     supabaseAdmin,
     member_id: member.id,
     type: "receipt",
-    to: member.email,
+    to: resendGuard.to,
     subject: `Payment Receipt ${payment.receipt_number} — ${gymName}`,
     html,
     membership_id: payment.membership_id,

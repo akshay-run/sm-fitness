@@ -4,6 +4,23 @@ import { useMemo, useState } from "react";
 import { createMemberSchema, type CreateMemberInput } from "@/lib/validations/member.schema";
 import { todayISTDateString } from "@/lib/dateUtils";
 
+const SUSPICIOUS_EMAIL_DOMAINS = new Set([
+  "gmial.com",
+  "gmai.com",
+  "yaho.com",
+  "hotnail.com",
+  "outlok.com",
+  "rediffmial.com",
+]);
+
+function suspiciousEmailDomain(email: string): boolean {
+  const t = email.trim().toLowerCase();
+  const at = t.lastIndexOf("@");
+  if (at === -1) return false;
+  const domain = t.slice(at + 1);
+  return SUSPICIOUS_EMAIL_DOMAINS.has(domain);
+}
+
 type Props = {
   initial?: Partial<CreateMemberInput>;
   submitLabel: string;
@@ -30,6 +47,7 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
   const [form, setForm] = useState(defaults);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailTypoHint, setEmailTypoHint] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,16 +107,25 @@ export function MemberForm({ initial, submitLabel, onSubmit }: Props) {
               />
             </Field>
 
-            <Field label="Email" required htmlFor="email">
+            <Field label="Email (optional)" htmlFor="email">
               <input
                 id="email"
                 type="email"
+                placeholder="member@gmail.com"
                 className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
                 value={form.email ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                onChange={(e) => {
+                  setEmailTypoHint(false);
+                  setForm((f) => ({ ...f, email: e.target.value }));
+                }}
+                onBlur={() => setEmailTypoHint(suspiciousEmailDomain(form.email ?? ""))}
                 disabled={submitting}
-                required
               />
+              {emailTypoHint ? (
+                <p className="mt-1 text-xs text-amber-700">
+                  This email looks unusual — double-check before saving.
+                </p>
+              ) : null}
             </Field>
           </div>
         </section>

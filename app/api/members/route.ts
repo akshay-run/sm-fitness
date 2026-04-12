@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { createMemberSchema } from "@/lib/validations/member.schema";
 import { getNextMemberCode } from "@/lib/memberCode";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
+import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderWelcomeEmail } from "@/components/email/WelcomeEmail";
 import { internalServerError } from "@/lib/apiError";
 
@@ -12,12 +13,39 @@ const listQuerySchema = z.object({
   q: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
+  tab: z.enum(["all", "active_membership", "expired", "deactivated"]).optional(),
   is_active: z
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
   expiring_within_days: z.coerce.number().int().min(1).max(90).optional(),
 });
+
+type MemberRow = {
+  id: string;
+  member_code: string;
+  full_name: string;
+  mobile: string;
+  email: string | null;
+  photo_url: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+function buildLatestMembershipMap(
+  rows: Array<{ member_id: string; plan_id: string; end_date: string }>
+) {
+  const latestMembershipMap = new Map<string, { plan_id: string; end_date: string }>();
+  for (const m of rows) {
+    if (!latestMembershipMap.has(String(m.member_id))) {
+      latestMembershipMap.set(String(m.member_id), {
+        plan_id: String(m.plan_id),
+        end_date: String(m.end_date),
+      });
+    }
+  }
+  return latestMembershipMap;
+}
 
 export async function GET(req: Request) {
   const { user, error } = await requireUser();
@@ -28,6 +56,7 @@ export async function GET(req: Request) {
     q: url.searchParams.get("q") ?? undefined,
     page: url.searchParams.get("page") ?? undefined,
     pageSize: url.searchParams.get("pageSize") ?? undefined,
+    tab: url.searchParams.get("tab") ?? undefined,
     is_active: url.searchParams.get("is_active") ?? undefined,
     expiring_within_days: url.searchParams.get("expiring_within_days") ?? undefined,
   });
@@ -35,9 +64,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const { q, page, pageSize, is_active, expiring_within_days } = parsed.data;
+  let { tab } = parsed.data;
+  const { q, page, pageSize, is_active: legacyIsActive, expiring_within_days } = parsed.data;
+  if (!tab) {
+    if (legacyIsActive === false) tab = "deactivated";
+    else tab = "all";
+  }
+
   const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
 
   const supabaseAdmin = createSupabaseAdminClient();
 
@@ -49,7 +83,57 @@ export async function GET(req: Request) {
     day: "2-digit",
   }).format(today);
 
-  let memberIdsFilter: string[] | null = null;
+  const { data: allMembershipRows, error: msErr } = await supabaseAdmin
+    .from("memberships")
+    .select("member_id, plan_id, end_date, status")
+    .neq("status", "cancelled")
+    .order("end_date", { ascending: false });
+
+  if (msErr) return internalServerError("Failed to load memberships");
+
+  const latestEndByMember = new Map<string, { plan_id: string; end_date: string }>();
+  for (const m of allMembershipRows ?? []) {
+    const mid = String(m.member_id);
+    if (!latestEndByMember.has(mid)) {
+      latestEndByMember.set(mid, {
+        plan_id: String(m.plan_id),
+        end_date: String(m.end_date),
+      });
+    }
+  }
+
+  const { data: memberIndex, error: idxErr } = await supabaseAdmin
+    .from("members")
+    .select("id, is_active, created_at");
+
+  if (idxErr) return internalServerError("Failed to load members");
+
+  const indexRows = (memberIndex ?? []) as Array<{ id: string; is_active: boolean; created_at: string }>;
+
+  const tabCounts = {
+    all: 0,
+    active_membership: 0,
+    expired: 0,
+    deactivated: 0,
+  };
+  const activeMemberIds: string[] = [];
+  const deactivatedMemberIds: string[] = [];
+  for (const r of indexRows) {
+    if (r.is_active) {
+      activeMemberIds.push(r.id);
+      tabCounts.all += 1;
+      const latest = latestEndByMember.get(r.id);
+      const end = latest?.end_date;
+      const hasActiveMembership = Boolean(end && end >= todayIST);
+      if (hasActiveMembership) tabCounts.active_membership += 1;
+      else tabCounts.expired += 1;
+    } else {
+      deactivatedMemberIds.push(r.id);
+      tabCounts.deactivated += 1;
+    }
+  }
+
+  let expiringIdSet: Set<string> | null = null;
   if (expiring_within_days != null) {
     const cap = new Date(`${todayIST}T00:00:00+05:30`);
     cap.setDate(cap.getDate() + expiring_within_days);
@@ -66,45 +150,90 @@ export async function GET(req: Request) {
       .gte("end_date", todayIST)
       .lte("end_date", capStr)
       .neq("status", "cancelled");
-    memberIdsFilter = [...new Set((memRows ?? []).map((r) => String(r.member_id)))];
-    if (memberIdsFilter.length === 0) {
+    expiringIdSet = new Set((memRows ?? []).map((r) => String(r.member_id)));
+    if (expiringIdSet.size === 0) {
       return NextResponse.json({
         items: [],
         page,
         pageSize,
         total: 0,
+        tab,
+        tabCounts,
       });
     }
   }
 
-  let query = supabaseAdmin
-    .from("members")
-    .select(
-      "id, member_code, full_name, mobile, email, photo_url, is_active, created_at",
-      { count: "exact" }
-    )
-    .order("created_at", { ascending: false });
-
-  if (typeof is_active === "boolean") query = query.eq("is_active", is_active);
-  if (memberIdsFilter) query = query.in("id", memberIdsFilter);
-  if (q && q.trim()) {
-    const qq = q.trim();
-    query = query.or(`full_name.ilike.%${qq}%,mobile.ilike.%${qq}%`);
+  function membershipCategory(memberId: string, isActive: boolean): "active_membership" | "expired" | "deactivated" {
+    if (!isActive) return "deactivated";
+    const latest = latestEndByMember.get(memberId);
+    const end = latest?.end_date;
+    if (end && end >= todayIST) return "active_membership";
+    return "expired";
   }
 
-  const { data, error: dbError, count } = await query.range(from, to);
-  if (dbError) return internalServerError("Failed to load members");
+  let filteredIds: string[] = [];
+  if (tab === "deactivated") {
+    filteredIds = deactivatedMemberIds;
+  } else if (tab === "all") {
+    filteredIds = activeMemberIds;
+  } else if (tab === "active_membership") {
+    filteredIds = activeMemberIds.filter((id) => membershipCategory(id, true) === "active_membership");
+  } else {
+    filteredIds = activeMemberIds.filter((id) => membershipCategory(id, true) === "expired");
+  }
 
-  const items = (data ?? []) as Array<{
-    id: string;
-    member_code: string;
-    full_name: string;
-    mobile: string;
-    email: string | null;
-    photo_url: string | null;
-    is_active: boolean;
-    created_at: string;
-  }>;
+  if (expiringIdSet) {
+    filteredIds = filteredIds.filter((id) => expiringIdSet!.has(id));
+  }
+
+  const createdAtById = new Map(indexRows.map((r) => [r.id, r.created_at]));
+  filteredIds.sort((a, b) => {
+    const ca = createdAtById.get(a) ?? "";
+    const cb = createdAtById.get(b) ?? "";
+    return cb.localeCompare(ca);
+  });
+
+  let listIds = filteredIds;
+  if (q && q.trim()) {
+    const qq = q.trim();
+    if (filteredIds.length === 0) {
+      listIds = [];
+    } else {
+      const { data: matchRows, error: matchErr } = await supabaseAdmin
+        .from("members")
+        .select("id")
+        .in("id", filteredIds)
+        .or(`full_name.ilike.%${qq}%,mobile.ilike.%${qq}%`);
+      if (matchErr) return internalServerError("Failed to search members");
+      const matchSet = new Set((matchRows ?? []).map((r) => String(r.id)));
+      listIds = filteredIds.filter((id) => matchSet.has(id));
+    }
+  }
+
+  const total = listIds.length;
+  const pageIds = listIds.slice(from, from + pageSize);
+
+  if (pageIds.length === 0) {
+    return NextResponse.json({
+      items: [],
+      page,
+      pageSize,
+      total,
+      tab,
+      tabCounts,
+    });
+  }
+
+  const { data: pageRows, error: pageErr } = await supabaseAdmin
+    .from("members")
+    .select("id, member_code, full_name, mobile, email, photo_url, is_active, created_at")
+    .in("id", pageIds);
+
+  if (pageErr) return internalServerError("Failed to load members");
+
+  const items = (pageRows ?? []) as MemberRow[];
+  const orderIndex = new Map(pageIds.map((id, i) => [id, i]));
+  items.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
 
   const memberIds = items.map((m) => m.id);
   const { data: memberships } = memberIds.length
@@ -122,15 +251,9 @@ export async function GET(req: Request) {
     : { data: [] as Array<{ id: string; name: string }> };
   const planMap = new Map((plans ?? []).map((p) => [String(p.id), p.name]));
 
-  const latestMembershipMap = new Map<string, { plan_id: string; end_date: string }>();
-  for (const m of memberships ?? []) {
-    if (!latestMembershipMap.has(String(m.member_id))) {
-      latestMembershipMap.set(String(m.member_id), {
-        plan_id: String(m.plan_id),
-        end_date: String(m.end_date),
-      });
-    }
-  }
+  const latestMembershipMap = buildLatestMembershipMap(
+    (memberships ?? []) as Array<{ member_id: string; plan_id: string; end_date: string }>
+  );
 
   return NextResponse.json({
     items: await Promise.all(
@@ -173,7 +296,9 @@ export async function GET(req: Request) {
     ),
     page,
     pageSize,
-    total: count ?? 0,
+    total,
+    tab,
+    tabCounts,
   });
 }
 
@@ -210,7 +335,7 @@ export async function POST(req: Request) {
     member_code,
     full_name: parsed.data.full_name,
     mobile: parsed.data.mobile,
-    email: parsed.data.email,
+    email: parsed.data.email?.trim() ? parsed.data.email.trim() : null,
     date_of_birth: parsed.data.date_of_birth ? parsed.data.date_of_birth : null,
     gender: parsed.data.gender ?? null,
     address: parsed.data.address ? parsed.data.address : null,
@@ -229,7 +354,11 @@ export async function POST(req: Request) {
   if (dbError) return internalServerError("Failed to create member");
 
   // Welcome email (optional if email exists), duplicate-prevented via email_logs.
-  if (data.email) {
+  const welcomeGuard = skipMemberEmailIfNoAddress({
+    full_name: data.full_name,
+    email: data.email,
+  });
+  if (!welcomeGuard.skipped) {
     const already = await hasSentEmail({
       supabaseAdmin,
       member_id: data.id,
@@ -248,7 +377,7 @@ export async function POST(req: Request) {
         supabaseAdmin,
         member_id: data.id,
         type: "welcome",
-        to: data.email,
+        to: welcomeGuard.to,
         subject: `Welcome to ${gymName}, ${firstName}! 🎉`,
         html,
       });

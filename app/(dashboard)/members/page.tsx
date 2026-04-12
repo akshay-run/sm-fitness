@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { formatDateShortIST } from "@/lib/uiFormat";
 import {
   membershipRenewalReminderMessage,
@@ -12,11 +13,14 @@ import {
   whatsappLink,
 } from "@/lib/messageTemplates";
 
+type MemberTab = "all" | "active_membership" | "expired" | "deactivated";
+
 type MemberListItem = {
   id: string;
   member_code: string;
   full_name: string;
   mobile: string;
+  is_active?: boolean;
   membership_plan_name?: string | null;
   membership_end_date?: string | null;
   membership_status?: "active" | "expiring" | "expired" | "none";
@@ -29,16 +33,31 @@ type MemberListResponse = {
   page: number;
   pageSize: number;
   total: number;
+  tab?: MemberTab;
+  tabCounts?: {
+    all: number;
+    active_membership: number;
+    expired: number;
+    deactivated: number;
+  };
 };
+
+const TAB_LABELS: { id: MemberTab; short: string }[] = [
+  { id: "all", short: "All" },
+  { id: "active_membership", short: "Active" },
+  { id: "expired", short: "Expired" },
+  { id: "deactivated", short: "Deactivated" },
+];
 
 export default function MembersPage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   const q = searchParams.get("q") ?? "";
   const page = Number(searchParams.get("page") ?? "1");
-  const is_active = searchParams.get("is_active") ?? "true";
+  const tab = (searchParams.get("tab") ?? "all") as MemberTab;
   const expiring_within_days = searchParams.get("expiring_within_days");
 
   const [inputQ, setInputQ] = useState(q);
@@ -47,6 +66,7 @@ export default function MembersPage() {
     page: 1,
     pageSize: 20,
     total: 0,
+    tabCounts: { all: 0, active_membership: 0, expired: 0, deactivated: 0 },
   };
   const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
 
@@ -74,11 +94,11 @@ export default function MembersPage() {
     const sp = new URLSearchParams();
     sp.set("page", String(Math.max(1, page)));
     sp.set("pageSize", "20");
+    sp.set("tab", tab);
     if (q) sp.set("q", q);
-    if (is_active) sp.set("is_active", is_active);
     if (expiring_within_days) sp.set("expiring_within_days", expiring_within_days);
     return sp.toString();
-  }, [q, page, is_active, expiring_within_days]);
+  }, [q, page, tab, expiring_within_days]);
 
   const {
     data: queryData,
@@ -96,6 +116,7 @@ export default function MembersPage() {
 
   const data = queryData ?? emptyData;
   const error = queryError instanceof Error ? queryError.message : null;
+  const tabCounts = data.tabCounts ?? emptyData.tabCounts!;
 
   const totalPages = Math.max(1, Math.ceil((data.total ?? 0) / (data.pageSize ?? 20)));
 
@@ -126,22 +147,22 @@ export default function MembersPage() {
     (next: {
       q?: string;
       page?: number;
-      is_active?: string;
+      tab?: MemberTab;
       expiring_within_days?: string | null;
     }) => {
       const sp = new URLSearchParams();
       const nq = next.q ?? q;
       const np = next.page ?? page;
-      const ns = next.is_active ?? is_active;
+      const nt = next.tab ?? tab;
       const ne =
         next.expiring_within_days !== undefined ? next.expiring_within_days : expiring_within_days;
       if (nq) sp.set("q", nq);
       sp.set("page", String(Math.max(1, np)));
-      sp.set("is_active", ns);
+      sp.set("tab", nt);
       if (ne) sp.set("expiring_within_days", ne);
       router.push(`${pathname}?${sp.toString()}`);
     },
-    [expiring_within_days, is_active, page, pathname, q, router]
+    [expiring_within_days, q, page, pathname, router, tab]
   );
 
   useEffect(() => {
@@ -152,6 +173,22 @@ export default function MembersPage() {
     }, 300);
     return () => clearTimeout(t);
   }, [inputQ, navigate, q]);
+
+  async function reactivateMember(m: MemberListItem) {
+    const res = await fetch(`/api/members/${m.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: true }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(json?.error ?? "Failed to reactivate");
+      return;
+    }
+    toast.success("Member reactivated ✓");
+    await queryClient.invalidateQueries({ queryKey: ["members"] });
+    navigate({ tab: "all", page: 1 });
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl p-6">
@@ -182,31 +219,33 @@ export default function MembersPage() {
           />
         </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => navigate({ is_active: "true", page: 1, expiring_within_days: null })}
-            className={[
-              "rounded-lg px-3 py-2 text-sm",
-              is_active !== "false"
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 hover:bg-zinc-50",
-            ].join(" ")}
-          >
-            Active
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate({ is_active: "false", page: 1, expiring_within_days: null })}
-            className={[
-              "rounded-lg px-3 py-2 text-sm",
-              is_active === "false"
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 hover:bg-zinc-50",
-            ].join(" ")}
-          >
-            Inactive
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {TAB_LABELS.map(({ id, short }) => {
+            const count =
+              id === "all"
+                ? tabCounts.all
+                : id === "active_membership"
+                  ? tabCounts.active_membership
+                  : id === "expired"
+                    ? tabCounts.expired
+                    : tabCounts.deactivated;
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigate({ tab: id, page: 1, expiring_within_days: null })}
+                className={[
+                  "rounded-full px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-zinc-900 text-white"
+                    : "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
+                ].join(" ")}
+              >
+                {short} ({count})
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -233,9 +272,11 @@ export default function MembersPage() {
                   )}
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-[#1A1A2E]">{m.full_name}</div>
-                    <div className="text-sm text-slate-500">{m.member_code} · {m.mobile}</div>
+                    <div className="text-sm text-slate-500">
+                      {m.member_code} · {m.mobile}
+                    </div>
                     <div className="text-xs text-slate-500">
-                      {(m.membership_plan_name ?? "No plan")} ·{" "}
+                      {m.membership_plan_name ?? "No plan"} ·{" "}
                       {m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "No expiry"}
                     </div>
                   </div>
@@ -243,27 +284,48 @@ export default function MembersPage() {
                 <StatusBadge status={m.membership_status ?? "none"} daysLeft={m.membership_days_left ?? null} />
               </div>
 
-              <div className="mt-3 flex items-center justify-between">
-                {m.membership_status === "active" || m.membership_status === "expiring" ? (
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={whatsappLink(m.mobile, reminderForMember(m))}
-                      className="status-success rounded px-2 py-1 text-xs"
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {tab === "deactivated" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Reactivate ${m.full_name}? They will appear in the active members list and can be assigned a new membership.`
+                          )
+                        ) {
+                          void reactivateMember(m);
+                        }
+                      }}
+                      className="rounded-lg border border-green-600 bg-green-50 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-100"
                     >
-                      WhatsApp
-                    </a>
-                    <a
-                      href={smsLink(m.mobile, reminderForMember(m))}
-                      className="status-info rounded px-2 py-1 text-xs"
+                      Reactivate
+                    </button>
+                  ) : m.membership_status === "active" || m.membership_status === "expiring" ? (
+                    <>
+                      <a
+                        href={whatsappLink(m.mobile, reminderForMember(m))}
+                        className="status-success rounded px-2 py-1 text-xs"
+                      >
+                        WhatsApp
+                      </a>
+                      <a
+                        href={smsLink(m.mobile, reminderForMember(m))}
+                        className="status-info rounded px-2 py-1 text-xs"
+                      >
+                        SMS
+                      </a>
+                    </>
+                  ) : (
+                    <Link
+                      href={`/memberships/new?memberId=${m.id}`}
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
                     >
-                      SMS
-                    </a>
-                  </div>
-                ) : (
-                  <Link href={`/memberships/new?memberId=${m.id}`} className="rounded-lg border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50">
-                    Renew
-                  </Link>
-                )}
+                      Renew
+                    </Link>
+                  )}
+                </div>
                 <Link href={`/members/${m.id}`} className="text-sm font-medium text-[#1A1A2E] underline">
                   Open →
                 </Link>
@@ -271,7 +333,9 @@ export default function MembersPage() {
             </div>
           ))
         ) : (
-          <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">No members found.</div>
+          <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+            No members found.
+          </div>
         )}
       </div>
 
@@ -321,4 +385,3 @@ function StatusBadge({
   if (status === "expired") return <span className="status-danger rounded px-2 py-1 text-xs">Expired</span>;
   return <span className="status-neutral rounded px-2 py-1 text-xs">No membership</span>;
 }
-

@@ -11,9 +11,33 @@ vi.mock("@/lib/email", () => ({
   sendAndLog: vi.fn(async () => ({ ok: true })),
 }));
 
+vi.mock("@/lib/memberEmail", () => ({
+  skipMemberEmailIfNoAddress: vi.fn((m: { email?: string | null }) =>
+    m.email?.trim() ? { skipped: false as const, to: m.email.trim() } : { skipped: true as const }
+  ),
+}));
+
 vi.mock("@/components/email/WelcomeEmail", () => ({
   renderWelcomeEmail: vi.fn(() => "<html>welcome</html>"),
 }));
+
+const memberRow = {
+  id: "member-1",
+  member_code: "GYM-001",
+  full_name: "Aman",
+  mobile: "9876543210",
+  email: "aman@example.com",
+  photo_url: null,
+  is_active: true,
+  created_at: "2026-01-01T00:00:00Z",
+};
+
+const membershipRow = {
+  member_id: "member-1",
+  plan_id: "plan-1",
+  end_date: "2099-01-01",
+  status: "active",
+};
 
 function makeMembersSupabaseMock() {
   return {
@@ -26,18 +50,20 @@ function makeMembersSupabaseMock() {
       if (table === "memberships") {
         return {
           select: () => ({
+            neq: () => ({
+              order: () =>
+                Promise.resolve({
+                  data: [membershipRow],
+                  error: null,
+                }),
+            }),
             in: () => ({
               neq: () => ({
-                order: async () => ({
-                  data: [
-                    {
-                      member_id: "member-1",
-                      plan_id: "plan-1",
-                      end_date: "2099-01-01",
-                      status: "active",
-                    },
-                  ],
-                }),
+                order: () =>
+                  Promise.resolve({
+                    data: [membershipRow],
+                    error: null,
+                  }),
               }),
             }),
           }),
@@ -54,52 +80,32 @@ function makeMembersSupabaseMock() {
       }
       if (table !== "members") throw new Error(`Unexpected table ${table}`);
       return {
-        select: () => ({
-          order: () => ({
-            eq: () => ({
-              or: () => ({
-                range: async () => ({
-                  data: [
-                    {
-                      id: "member-1",
-                      member_code: "GYM-001",
-                      full_name: "Aman",
-                      mobile: "9876543210",
-                      email: "aman@example.com",
-                    },
-                  ],
-                  error: null,
-                  count: 1,
-                }),
-              }),
-              range: async () => ({
-                data: [
-                  {
-                    id: "member-1",
-                    member_code: "GYM-001",
-                    full_name: "Aman",
-                    mobile: "9876543210",
-                    email: "aman@example.com",
-                  },
-                ],
-                error: null,
-                count: 1,
-              }),
-            }),
-            or: () => ({
-              range: async () => ({
-                data: [],
-                error: null,
-                count: 0,
-              }),
-            }),
-            range: async () => ({
-              data: [],
+        select: (fields: string) => {
+          if (fields === "id, is_active, created_at") {
+            return Promise.resolve({
+              data: [memberRow],
               error: null,
-              count: 0,
-            }),
-          }),
-        }),
+            });
+          }
+          if (fields === "id") {
+            return {
+              in: () => ({
+                or: () =>
+                  Promise.resolve({
+                    data: [{ id: "member-1" }],
+                    error: null,
+                  }),
+              }),
+            };
+          }
+          return {
+            in: () =>
+              Promise.resolve({
+                data: [memberRow],
+                error: null,
+              }),
+          };
+        },
         insert: () => ({
           select: () => ({
             single: async () => ({
@@ -132,11 +138,12 @@ describe("members route", () => {
 
   it("GET returns paginated members", async () => {
     const { GET } = await import("@/app/api/members/route");
-    const req = new Request("http://localhost/api/members?page=1&pageSize=20&is_active=true");
+    const req = new Request("http://localhost/api/members?page=1&pageSize=20&tab=all");
     const res = await GET(req);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(Array.isArray(json.items)).toBe(true);
+    expect(json.tabCounts).toBeDefined();
   });
 
   it("POST creates member with generated code", async () => {
@@ -191,4 +198,3 @@ describe("members route", () => {
     expect(res.status).toBe(401);
   });
 });
-

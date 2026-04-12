@@ -14,6 +14,7 @@ export default function NewMembershipPage() {
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [memberName, setMemberName] = useState<string>("");
+  const [latestActiveEndDate, setLatestActiveEndDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +40,11 @@ export default function NewMembershipPage() {
         if (!cancelled) {
           setPlans(plansJson.plans ?? []);
           setMemberName(memberJson.member?.full_name ?? "");
+          setLatestActiveEndDate(
+            memberJson.latest_active_end_date != null
+              ? String(memberJson.latest_active_end_date)
+              : null
+          );
         }
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
@@ -90,6 +96,7 @@ export default function NewMembershipPage() {
           <MembershipForm
             memberId={memberId}
             plans={plans}
+            latestActiveEndDate={latestActiveEndDate}
             onCreated={({ id }) => {
               toast.success("Membership created");
               router.replace(`/payments?membershipId=${id}`);

@@ -13,6 +13,12 @@ vi.mock("@/lib/email", () => ({
   sendAndLog: vi.fn(async () => ({ ok: true })),
 }));
 
+vi.mock("@/lib/memberEmail", () => ({
+  skipMemberEmailIfNoAddress: vi.fn((m: { email?: string | null }) =>
+    m.email?.trim() ? { skipped: false as const, to: m.email.trim() } : { skipped: true as const }
+  ),
+}));
+
 vi.mock("@/components/email/ReminderEmail", () => ({
   renderReminderEmail: vi.fn(() => "<html>reminder</html>"),
 }));
@@ -27,6 +33,14 @@ function createCronSupabaseMock() {
               eq: async () => ({
                 data: [{ id: "ms1", member_id: "m1", plan_id: "p1", end_date: "2026-04-17" }],
                 error: null,
+              }),
+            }),
+            eq: () => ({
+              gte: () => ({
+                limit: async () => ({
+                  data: [] as { id: string; start_date: string }[],
+                  error: null,
+                }),
               }),
             }),
           }),

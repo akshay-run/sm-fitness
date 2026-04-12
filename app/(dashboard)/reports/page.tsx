@@ -195,7 +195,7 @@ export default function ReportsPage() {
         ["Cash total", pdfAmount(data.summary.cash_total)],
         ["UPI total", pdfAmount(data.summary.upi_total)],
         ["Grand total", pdfAmount(data.summary.grand_total)],
-        ["New members in period", String(data.summary.new_members)],
+        ["New members", String(data.summary.new_members)],
       ],
       styles: {
         font: tableFont,
@@ -213,14 +213,18 @@ export default function ReportsPage() {
         cellPadding: PDF_CELL_PAD,
       },
       columnStyles: {
-        0: { cellWidth: 283 },
-        1: { cellWidth: 232, halign: "right", fontStyle: "bold" },
+        0: { cellWidth: 300, halign: "left" },
+        1: { cellWidth: 215, halign: "right" },
       },
       didParseCell: (hook) => {
         stripeBodyRow(hook);
-        if (hook.section === "body" && hook.column.index === 1) {
-          hook.cell.styles.halign = "right";
+        if (hook.section === "head") {
+          hook.cell.styles.halign = hook.column.index === 0 ? "left" : "right";
           hook.cell.styles.fontStyle = "bold";
+        }
+        if (hook.section === "body") {
+          hook.cell.styles.halign = hook.column.index === 0 ? "left" : "right";
+          if (hook.column.index === 1) hook.cell.styles.fontStyle = "bold";
         }
       },
       tableWidth: PDF_CONTENT_W,
@@ -268,8 +272,18 @@ export default function ReportsPage() {
       didParseCell: (hook) => {
         stripeBodyRow(hook);
         if (hook.section === "head" && hook.column.index === 4) hook.cell.styles.halign = "right";
-        if (hook.section === "body" && hook.column.index === 4) hook.cell.styles.halign = "right";
-        if (hook.section === "body" && hook.column.index === 5) hook.cell.styles.halign = "left";
+        if (hook.section === "head" && hook.column.index === 5) {
+          hook.cell.styles.halign = "left";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
+        if (hook.section === "body" && hook.column.index === 4) {
+          hook.cell.styles.halign = "right";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
+        if (hook.section === "body" && hook.column.index === 5) {
+          hook.cell.styles.halign = "left";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
       },
       tableWidth: PDF_CONTENT_W,
       margin: { left: margin, right: margin },

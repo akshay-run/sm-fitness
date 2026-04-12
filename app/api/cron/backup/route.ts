@@ -3,6 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { sendMail } from "@/lib/mailer";
 import { logBackupEmail } from "@/lib/email";
+import { skipBackupEmailIfNoRecipient } from "@/lib/memberEmail";
 import { IST_TZ, monthBoundsIST, todayISTDateString } from "@/lib/dateUtils";
 
 type MemberRow = {
@@ -105,15 +106,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 
-  const backupEmail =
-    (settingsRow?.backup_email && String(settingsRow.backup_email).trim()) ||
-    (process.env.BACKUP_EMAIL && process.env.BACKUP_EMAIL.trim()) ||
+  const backupEmailRaw =
+    (settingsRow?.backup_email && String(settingsRow.backup_email)) ||
+    (process.env.BACKUP_EMAIL && String(process.env.BACKUP_EMAIL)) ||
     "";
 
-  if (!backupEmail) {
-    console.warn("[cron/backup] No backup_email in gym_settings and BACKUP_EMAIL env not set; skipping send.");
+  const backupSkip = skipBackupEmailIfNoRecipient(backupEmailRaw);
+  if (backupSkip.skipped) {
     return NextResponse.json({ ok: true, skipped: true, reason: "no_backup_recipient" });
   }
+  const backupEmail = backupSkip.to;
 
   const planName = new Map((plans ?? []).map((p) => [String(p.id), String(p.name ?? "Plan")]));
 

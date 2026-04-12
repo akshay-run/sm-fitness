@@ -6,7 +6,11 @@ import { internalServerError } from "@/lib/apiError";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  duration_months: z.coerce.number().int().min(1).max(120),
+  duration_months: z.coerce
+    .number()
+    .int("Must be a whole number")
+    .min(1, "Plan duration must be at least 1 month")
+    .max(36, "Plan duration cannot exceed 36 months"),
   default_price: z.coerce.number().nonnegative().nullable().optional(),
 });
 

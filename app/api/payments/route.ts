@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { createPaymentSchema } from "@/lib/validations/payment.schema";
 import { getNextReceiptNumber } from "@/lib/receiptNumber";
 import { hasSentEmail, sendAndLog } from "@/lib/email";
+import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderReceiptEmail } from "@/components/email/ReceiptEmail";
 import { internalServerError } from "@/lib/apiError";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
@@ -123,7 +124,10 @@ export async function POST(req: Request) {
     .eq("id", membership.member_id)
     .single();
 
-  if (member?.email) {
+  const receiptGuard = member
+    ? skipMemberEmailIfNoAddress({ full_name: member.full_name, email: member.email })
+    : { skipped: true as const };
+  if (member && !receiptGuard.skipped) {
     const already = await hasSentEmail({
       supabaseAdmin,
       member_id: member.id,
@@ -156,7 +160,7 @@ export async function POST(req: Request) {
         supabaseAdmin,
         member_id: member.id,
         type: "receipt",
-        to: member.email,
+        to: receiptGuard.to,
         subject: `Payment Receipt ${receipt_number} — ${gymName}`,
         html,
         membership_id: membership.id,

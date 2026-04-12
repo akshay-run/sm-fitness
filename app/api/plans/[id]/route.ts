@@ -8,7 +8,12 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  duration_months: z.coerce.number().int().min(1).max(120).optional(),
+  duration_months: z.coerce
+    .number()
+    .int("Must be a whole number")
+    .min(1, "Plan duration must be at least 1 month")
+    .max(36, "Plan duration cannot exceed 36 months")
+    .optional(),
   default_price: z.coerce.number().nonnegative().nullable().optional(),
   is_active: z.boolean().optional(),
 });

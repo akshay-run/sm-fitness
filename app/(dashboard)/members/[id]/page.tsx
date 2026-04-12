@@ -4,12 +4,14 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 import {
   membershipRenewalReminderMessage,
   reminderMessage,
   smsLink,
+  welcomeMemberWhatsAppMessage,
   whatsappLink,
 } from "@/lib/messageTemplates";
 
@@ -37,9 +39,18 @@ type Member = {
   photo_url: string | null;
   notes: string | null;
   is_active: boolean;
+  welcome_wa_sent?: boolean | null;
   created_at: string;
   updated_at: string;
 };
+
+function WhatsAppGlyph({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
+}
 
 type MembershipSummary = {
   plan_name: string | null;
@@ -78,7 +89,11 @@ export default function MemberProfilePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reactivateOpen, setReactivateOpen] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [welcomeWaSent, setWelcomeWaSent] = useState(false);
+  const [whatsappGroupLink, setWhatsappGroupLink] = useState<string | null>(null);
   const [membership, setMembership] = useState<MembershipSummary | null>(null);
   const [membershipHistory, setMembershipHistory] = useState<MembershipHistoryRow[]>([]);
   const [ageYears, setAgeYears] = useState<number | null>(null);
@@ -94,7 +109,10 @@ export default function MemberProfilePage({
       try {
         const s = await fetch("/api/settings", { cache: "no-store" });
         const sj = await s.json();
-        if (s.ok && sj.gym_name && !cancelled) setGymName(String(sj.gym_name));
+        if (s.ok && !cancelled) {
+          if (sj.gym_name) setGymName(String(sj.gym_name));
+          if (sj.whatsapp_group_link != null) setWhatsappGroupLink(String(sj.whatsapp_group_link).trim() || null);
+        }
       } catch {
         /* ignore */
       }
@@ -117,6 +135,7 @@ export default function MemberProfilePage({
       } else {
         if (!cancelled) {
           setMember(json.member);
+          setWelcomeWaSent(json.member?.welcome_wa_sent === true);
           setPhotoSignedUrl(json.photoSignedUrl ?? null);
           setMembership(json.membershipSummary ?? null);
           setRecentPayments(json.recentPayments ?? []);
@@ -148,6 +167,40 @@ export default function MemberProfilePage({
     } finally {
       setDeactivating(false);
     }
+  }
+
+  async function reactivate() {
+    if (!member) return;
+    setReactivating(true);
+    try {
+      const res = await fetch(`/api/members/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to reactivate");
+      setReactivateOpen(false);
+      router.refresh();
+      const r2 = await fetch(`/api/members/${member.id}`, { cache: "no-store" });
+      const j2 = await r2.json();
+      setMember(j2.member);
+      setWelcomeWaSent(j2.member?.welcome_wa_sent === true);
+      toast.success("Member reactivated ✓");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to reactivate");
+    } finally {
+      setReactivating(false);
+    }
+  }
+
+  async function markWelcomeSent(memberId: string) {
+    const res = await fetch(`/api/members/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ welcome_wa_sent: true }),
+    });
+    if (res.ok) setWelcomeWaSent(true);
   }
 
   if (loading) {
@@ -207,6 +260,25 @@ export default function MemberProfilePage({
         ? formatDateShortIST(member.date_of_birth)
         : "—";
 
+  const planName = membership?.plan_name ?? "Membership";
+  const welcomeMessage =
+    membership?.start_date && membership?.end_date
+      ? welcomeMemberWhatsAppMessage({
+          fullName: member.full_name,
+          memberCode: member.member_code,
+          mobile: member.mobile,
+          planName,
+          startDate: formatDateShortIST(membership.start_date),
+          endDate: formatDateShortIST(membership.end_date),
+          whatsappGroupLink,
+        })
+      : "";
+
+  const showWelcomeWa =
+    member.is_active &&
+    Boolean(membership?.start_date && membership?.end_date) &&
+    !welcomeWaSent;
+
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
       <div className="flex items-start justify-between gap-4">
@@ -238,9 +310,13 @@ export default function MemberProfilePage({
               Deactivate
             </button>
           ) : (
-            <span className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-500">
-              Inactive
-            </span>
+            <button
+              type="button"
+              onClick={() => setReactivateOpen(true)}
+              className="rounded-lg border border-green-600 bg-green-50 px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-100"
+            >
+              Reactivate Member
+            </button>
           )}
         </div>
       </div>
@@ -257,7 +333,18 @@ export default function MemberProfilePage({
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Card label="Mobile" value={member.mobile} />
-        <Card label="Email" value={member.email ?? "—"} />
+        {member.email?.trim() ? (
+          <Card label="Email" value={member.email} />
+        ) : (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+            <div className="text-xs font-medium text-zinc-600">Email</div>
+            <div className="mt-2">
+              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                No email on file
+              </span>
+            </div>
+          </div>
+        )}
         <Card label="Plan" value={membership?.plan_name ?? "—"} />
         <Card
           label="Fee paid"
@@ -285,18 +372,32 @@ export default function MemberProfilePage({
         <a href={smsLink(member.mobile, reminder)} className="status-info rounded-lg px-3 py-2 text-center text-sm">
           💬 SMS
         </a>
+        {showWelcomeWa ? (
+          <a
+            href={whatsappLink(member.mobile, welcomeMessage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              void markWelcomeSent(member.id);
+            }}
+            className="col-span-2 flex items-center justify-center gap-2 rounded-lg border-2 border-green-600 bg-white px-3 py-2 text-center text-sm font-medium text-green-800 hover:bg-green-50"
+          >
+            <WhatsAppGlyph className="h-4 w-4 shrink-0" />
+            Send Welcome on WhatsApp
+          </a>
+        ) : null}
         <button
           type="button"
           className="status-neutral rounded-lg px-3 py-2 text-sm"
           onClick={async () => {
-            if (!member.email) {
+            if (!member.email?.trim()) {
               setError("Member has no email address.");
               return;
             }
             const body = {
               member_id: member.id,
               type: "welcome",
-              to: member.email,
+              to: member.email.trim(),
               subject: `Welcome to ${gymName}, ${member.full_name.split(" ")[0]}! 🎉`,
               html: `<p>Hi ${member.full_name},</p><p>Thanks for being part of ${gymName}.</p>`,
               allow_duplicate: true,
@@ -306,9 +407,11 @@ export default function MemberProfilePage({
               headers: { "content-type": "application/json" },
               body: JSON.stringify(body),
             });
+            const j = await res.json().catch(() => ({}));
             if (!res.ok) {
-              const j = await res.json().catch(() => ({}));
               setError(j?.error ?? "Failed to send email");
+            } else if (j?.skipped) {
+              setInfo("No email on file — email was not sent.");
             } else {
               setInfo("Email sent successfully.");
             }
@@ -384,12 +487,23 @@ export default function MemberProfilePage({
       <ConfirmDialog
         open={confirmOpen}
         title="Deactivate member?"
-        description="Are you sure you want to deactivate this member? They will be marked inactive; existing records are kept."
+        description={`Deactivate ${member.full_name}? They will be hidden from the active list. You can reactivate them anytime from the Inactive tab. Their payment history will be preserved.`}
         confirmText={deactivating ? "Deactivating..." : "Deactivate"}
         danger
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           if (!deactivating) void deactivate();
+        }}
+      />
+
+      <ConfirmDialog
+        open={reactivateOpen}
+        title={`Reactivate ${member.full_name}?`}
+        description={`Reactivate ${member.full_name}? They will appear in the active members list and can be assigned a new membership.`}
+        confirmText={reactivating ? "Reactivating..." : "Reactivate"}
+        onCancel={() => setReactivateOpen(false)}
+        onConfirm={() => {
+          if (!reactivating) void reactivate();
         }}
       />
     </div>

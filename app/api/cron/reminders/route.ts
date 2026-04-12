@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { verifyCronSecret } from "@/lib/cron";
 import { addDaysIST, todayISTDateString } from "@/lib/dateUtils";
 import { hasSentEmailOnDate, sendAndLog } from "@/lib/email";
+import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderReminderEmail } from "@/components/email/ReminderEmail";
 
 type JobStat = { attempted: number; sent: number; skipped: number; failed: number };
@@ -38,7 +39,21 @@ async function handleType({
       .eq("id", m.member_id)
       .single();
 
-    if (!member?.email || member.is_active === false) {
+    if (!member) {
+      stats.skipped += 1;
+      continue;
+    }
+
+    if (member.is_active === false) {
+      stats.skipped += 1;
+      continue;
+    }
+
+    const emailGuard = skipMemberEmailIfNoAddress({
+      full_name: member.full_name,
+      email: member.email,
+    });
+    if (emailGuard.skipped) {
       stats.skipped += 1;
       continue;
     }
@@ -53,6 +68,25 @@ async function handleType({
     if (already) {
       stats.skipped += 1;
       continue;
+    }
+
+    if (type === "expired" || type === "reminder_1d") {
+      const { data: newMembership } = await supabaseAdmin
+        .from("memberships")
+        .select("id, start_date")
+        .eq("member_id", member.id)
+        .gte("start_date", todayIST)
+        .limit(1);
+
+      if (newMembership && newMembership.length > 0) {
+        if (type === "expired") {
+          console.log(`Skipping expired email for ${member.full_name} — renewed today`);
+        } else {
+          console.log(`Skipping 1-day reminder for ${member.full_name} — renewed today`);
+        }
+        stats.skipped += 1;
+        continue;
+      }
     }
 
     const { data: plan } = await supabaseAdmin
@@ -80,7 +114,7 @@ async function handleType({
       supabaseAdmin,
       member_id: member.id,
       type,
-      to: member.email,
+      to: emailGuard.to,
       subject,
       html,
       membership_id: m.id,

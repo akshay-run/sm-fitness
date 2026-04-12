@@ -20,6 +20,9 @@ describe("dateUtils", () => {
   it("adds months for membership duration", () => {
     expect(addMonthsIST("2026-01-01", 1)).toBe("2026-02-01");
     expect(addMonthsIST("2026-01-01", 12)).toBe("2027-01-01");
+    // Jan 31 + 1 month → Feb 28 (date-fns addMonths)
+    expect(addMonthsIST("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonthsIST("2026-01-31", 3)).toBe("2026-04-30");
   });
 
   it("returns this and previous month bounds", () => {
