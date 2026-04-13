@@ -71,10 +71,7 @@ export default function MembersPage() {
   };
   const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
   const [restoreTarget, setRestoreTarget] = useState<MemberListItem | null>(null);
-  const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(
-    null,
-    (_prev, id: string | null) => id
-  );
+  const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
