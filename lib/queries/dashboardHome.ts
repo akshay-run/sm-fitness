@@ -9,6 +9,7 @@ import {
   previousMonthBoundsIST,
   todayISTDateString,
 } from "@/lib/dateUtils";
+import { getMembershipStatus, type MemberMembership } from "@/lib/members/memberStatus";
 
 export type DashboardUpcomingRow = {
   membership_id: string;
@@ -69,27 +70,58 @@ export const loadDashboardHome = cache(async () => {
   const today = todayISTDateString();
   const in7 = addDaysIST(today, 7);
 
-  const [{ count: totalMembers }, { count: activeMembers }] = await Promise.all([
-    supabaseAdmin.from("members").select("id", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("members")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-  ]);
+  const { data: allMembers } = await supabaseAdmin
+    .from("members")
+    .select(
+      `
+      id,
+      is_active,
+      memberships (
+        id,
+        end_date,
+        status
+      )
+    `
+    )
+    .order("created_at", { ascending: false });
 
-  const [{ count: expiredMemberships }, { count: expiringSoonMemberships }] = await Promise.all([
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .lt("end_date", today)
-      .neq("status", "cancelled"),
-    supabaseAdmin
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .gte("end_date", today)
-      .lte("end_date", in7)
-      .neq("status", "cancelled"),
-  ]);
+  const members = (allMembers ?? []) as {
+    id: string;
+    is_active: boolean;
+    memberships: { id: string; end_date: string | null; status: string | null }[] | null;
+  }[];
+
+  const membersForStatus = members.map((m) => ({
+    ...m,
+    memberships: (m.memberships ?? []).map(
+      (ms): MemberMembership => ({
+        id: ms.id,
+        start_date: null,
+        end_date: ms.end_date,
+        fee_charged: null,
+        status: ms.status,
+        plans: null,
+      })
+    ),
+  }));
+
+  const totalMembers = membersForStatus.filter((m) => m.is_active).length;
+  const expiringSoonMemberships = membersForStatus.filter((m) => {
+    if (!m.is_active) return false;
+    return getMembershipStatus(m) === "expiring_soon";
+  }).length;
+
+  const activeMembers = membersForStatus.filter((m) => {
+    if (!m.is_active) return false;
+    const s = getMembershipStatus(m);
+    return s === "active" || s === "expiring_soon";
+  }).length;
+
+  const expiredMemberships = membersForStatus.filter((m) => {
+    if (!m.is_active) return false;
+    const s = getMembershipStatus(m);
+    return s === "expired" || s === "no_membership";
+  }).length;
 
   const { startIST: thisMonthStart, endIST: thisMonthEnd } = monthBoundsIST();
   const { startIST: lastMonthStart, endIST: lastMonthEnd } = previousMonthBoundsIST();
@@ -221,10 +253,10 @@ export const loadDashboardHome = cache(async () => {
 
   return {
     today,
-    totalMembers: totalMembers ?? 0,
-    activeMembers: activeMembers ?? 0,
-    expiredMemberships: expiredMemberships ?? 0,
-    expiringSoonMemberships: expiringSoonMemberships ?? 0,
+    totalMembers,
+    activeMembers,
+    expiredMemberships,
+    expiringSoonMemberships,
     thisMonthRevenue,
     lastMonthRevenue,
     trendUp,
