@@ -2,13 +2,18 @@
 
 import { useEffect } from "react";
 
+export type ConfirmTone = "default" | "danger" | "success";
+
 export function ConfirmDialog({
   open,
   title,
   description,
   confirmText = "Confirm",
   cancelText = "Cancel",
+  /** @deprecated use confirmTone="danger" */
   danger,
+  confirmTone,
+  confirmDisabled,
   onConfirm,
   onCancel,
 }: {
@@ -18,11 +23,15 @@ export function ConfirmDialog({
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
+  confirmTone?: ConfirmTone;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   const titleId = "confirm-dialog-title";
   const descriptionId = "confirm-dialog-description";
+
+  const tone: ConfirmTone = confirmTone ?? (danger ? "danger" : "default");
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -33,6 +42,13 @@ export function ConfirmDialog({
   }, [open, onCancel]);
 
   if (!open) return null;
+
+  const confirmClass =
+    tone === "danger"
+      ? "bg-red-600 hover:bg-red-500 disabled:opacity-50"
+      : tone === "success"
+        ? "bg-green-600 hover:bg-green-500 disabled:opacity-50"
+        : "bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50";
 
   return (
     <div
@@ -47,7 +63,7 @@ export function ConfirmDialog({
           {title}
         </h2>
         {description ? (
-          <p id={descriptionId} className="mt-2 text-sm text-zinc-600">
+          <p id={descriptionId} className="mt-2 whitespace-pre-line text-sm text-zinc-600">
             {description}
           </p>
         ) : null}
@@ -61,11 +77,9 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
+            disabled={confirmDisabled}
             onClick={onConfirm}
-            className={[
-              "rounded-lg px-3 py-2 text-sm font-medium text-white",
-              danger ? "bg-red-600 hover:bg-red-500" : "bg-zinc-900 hover:bg-zinc-800",
-            ].join(" ")}
+            className={["rounded-lg px-3 py-2 text-sm font-medium text-white", confirmClass].join(" ")}
           >
             {confirmText}
           </button>
@@ -74,4 +88,3 @@ export function ConfirmDialog({
     </div>
   );
 }
-

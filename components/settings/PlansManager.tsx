@@ -14,6 +14,20 @@ type PlanRow = {
 const desktopGrid =
   "md:grid md:grid-cols-[minmax(0,35%)_minmax(0,15%)_minmax(0,15%)_minmax(0,15%)_minmax(0,20%)] md:items-center md:gap-2";
 
+function validatePlanDuration(months: number): string | null {
+  if (!Number.isFinite(months) || months < 1) {
+    return "Plan duration must be at least 1 month";
+  }
+  if (months > 36) {
+    return "Plan duration cannot exceed 36 months";
+  }
+  return null;
+}
+
+function inputInvalidClass(invalid: boolean): string {
+  return invalid ? "border-red-400 bg-red-50" : "border-zinc-200";
+}
+
 function StatusBadge({ active }: { active: boolean }) {
   return active ? (
     <span className="inline-flex shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
@@ -33,6 +47,8 @@ export function PlansManager() {
   const [months, setMonths] = useState("1");
   const [monthsError, setMonthsError] = useState<string | null>(null);
   const [price, setPrice] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -55,6 +71,12 @@ export function PlansManager() {
 
   async function addPlan(e: React.FormEvent) {
     e.preventDefault();
+    setNameError(null);
+    setPriceError(null);
+    if (name.trim() === "") {
+      setNameError("Plan name is required");
+      return;
+    }
     const m = Number(months);
     if (!Number.isFinite(m) || m < 1) {
       setMonthsError("Plan duration must be at least 1 month");
@@ -66,8 +88,8 @@ export function PlansManager() {
     }
     setMonthsError(null);
     const dp = price.trim() === "" ? null : Number(price);
-    if (price.trim() !== "" && Number.isNaN(dp)) {
-      toast.error("Invalid fee");
+    if (price.trim() !== "" && (dp === null || Number.isNaN(dp))) {
+      setPriceError("Please enter a valid fee amount");
       return;
     }
     try {
@@ -88,20 +110,11 @@ export function PlansManager() {
       setPrice("");
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 
   async function saveEdit(p: PlanRow) {
-    const dm = p.duration_months;
-    if (!Number.isFinite(dm) || dm < 1) {
-      toast.error("Plan duration must be at least 1 month");
-      return;
-    }
-    if (dm > 36) {
-      toast.error("Plan duration cannot exceed 36 months");
-      return;
-    }
     const dp = p.default_price;
     try {
       const res = await fetch(`/api/plans/${p.id}`, {
@@ -119,7 +132,7 @@ export function PlansManager() {
       setEditingId(null);
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 
@@ -136,7 +149,7 @@ export function PlansManager() {
       toast.success("Plan deactivated");
       await load();
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
     }
   }
 
@@ -147,16 +160,22 @@ export function PlansManager() {
         Duration defines membership length. Fee is a hint when assigning a membership.
       </p>
 
-      <form onSubmit={addPlan} className="card-surface mt-4 space-y-3 rounded-2xl border border-zinc-200 bg-white p-4">
+      <form onSubmit={addPlan} className="card-surface mt-4 space-y-3 rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="text-sm font-medium text-zinc-800">Add plan</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <input
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+          <div className="space-y-1">
+            <input
+              className={`rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!nameError)}`}
+              placeholder="Name"
+              value={name}
+              aria-invalid={!!nameError}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
+            />
+            {nameError ? <p className="text-xs text-red-600">{nameError}</p> : null}
+          </div>
           <div className="space-y-1">
             <input
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
@@ -181,15 +200,22 @@ export function PlansManager() {
             />
             {monthsError ? <p className="text-xs text-red-600">{monthsError}</p> : null}
           </div>
-          <input
-            className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder="Fee (optional)"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
+          <div className="space-y-1">
+            <input
+              className={`rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!priceError)}`}
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="Fee (optional)"
+              value={price}
+              aria-invalid={!!priceError}
+              onChange={(e) => {
+                setPrice(e.target.value);
+                if (priceError) setPriceError(null);
+              }}
+            />
+            {priceError ? <p className="text-xs text-red-600">{priceError}</p> : null}
+          </div>
         </div>
         <button
           type="submit"
@@ -218,7 +244,7 @@ export function PlansManager() {
             <div className="md:divide-y md:divide-zinc-100">
               {plans.map((p) => (
                 <PlanRowItem
-                  key={p.id}
+                  key={editingId === p.id ? `${p.id}-editing` : p.id}
                   plan={p}
                   editing={editingId === p.id}
                   onEdit={() => setEditingId(p.id)}
@@ -226,6 +252,7 @@ export function PlansManager() {
                   onSave={saveEdit}
                   onDeactivate={deactivate}
                   desktopGrid={desktopGrid}
+                  validateDuration={validatePlanDuration}
                 />
               ))}
             </div>
@@ -244,6 +271,7 @@ function PlanRowItem({
   onSave,
   onDeactivate,
   desktopGrid,
+  validateDuration,
 }: {
   plan: PlanRow;
   editing: boolean;
@@ -252,12 +280,20 @@ function PlanRowItem({
   onSave: (p: PlanRow) => void;
   onDeactivate: (id: string) => void;
   desktopGrid: string;
+  validateDuration: (months: number) => string | null;
 }) {
   const [draft, setDraft] = useState(plan);
+  const [durationError, setDurationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setDraft(plan);
-  }, [plan]);
+  function trySave() {
+    const err = validateDuration(draft.duration_months);
+    if (err) {
+      setDurationError(err);
+      return;
+    }
+    setDurationError(null);
+    onSave(draft);
+  }
 
   const feeLabel = plan.default_price != null ? `₹${plan.default_price}` : "—";
 
@@ -271,14 +307,22 @@ function PlanRowItem({
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           />
-          <input
-            type="number"
-            min={1}
-            max={36}
-            className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-            value={draft.duration_months}
-            onChange={(e) => setDraft({ ...draft, duration_months: Number(e.target.value) })}
-          />
+          <div className="space-y-1">
+            <input
+              type="number"
+              min={1}
+              max={36}
+              aria-invalid={!!durationError}
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!durationError)}`}
+              value={draft.duration_months}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setDraft({ ...draft, duration_months: n });
+                if (durationError) setDurationError(null);
+              }}
+            />
+            {durationError ? <p className="text-xs text-red-600">{durationError}</p> : null}
+          </div>
           <input
             type="number"
             min={0}
@@ -303,7 +347,7 @@ function PlanRowItem({
             <button
               type="button"
               className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm text-white"
-              onClick={() => onSave(draft)}
+              onClick={trySave}
             >
               Save
             </button>
@@ -317,15 +361,21 @@ function PlanRowItem({
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </div>
-          <div>
+          <div className="space-y-1">
             <input
               type="number"
               min={1}
               max={36}
-              className="w-full rounded border border-zinc-200 px-2 py-1 text-sm"
+              aria-invalid={!!durationError}
+              className={`w-full rounded border px-2 py-1 text-sm ${inputInvalidClass(!!durationError)}`}
               value={draft.duration_months}
-              onChange={(e) => setDraft({ ...draft, duration_months: Number(e.target.value) })}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setDraft({ ...draft, duration_months: n });
+                if (durationError) setDurationError(null);
+              }}
             />
+            {durationError ? <p className="text-xs text-red-600">{durationError}</p> : null}
           </div>
           <div>
             <input
@@ -352,7 +402,7 @@ function PlanRowItem({
             <button
               type="button"
               className="rounded bg-zinc-900 px-2 py-1 text-xs text-white"
-              onClick={() => onSave(draft)}
+              onClick={trySave}
             >
               Save
             </button>

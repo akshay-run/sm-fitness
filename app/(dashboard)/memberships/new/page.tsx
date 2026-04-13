@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { MembershipForm } from "@/components/memberships/MembershipForm";
+import { FlowSteps } from "@/components/ui/FlowSteps";
 
-type Plan = { id: string; name: string; duration_months: number };
+type Plan = { id: string; name: string; duration_months: number; default_price?: number | null };
 
 export default function NewMembershipPage() {
   const router = useRouter();
@@ -61,10 +62,10 @@ export default function NewMembershipPage() {
     return (
       <div className="mx-auto w-full max-w-3xl p-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Create membership
+          Save membership
         </h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Open a member profile and click “Assign membership”.
+          Open a member profile and click “Start membership”.
         </p>
       </div>
     );
@@ -74,8 +75,13 @@ export default function NewMembershipPage() {
     <div className="mx-auto w-full max-w-3xl p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Create membership
+          Save membership
         </h1>
+        <FlowSteps
+          steps={["Add member", "Start membership", "Record payment"]}
+          shortLabels={["Member", "Membership", "Payment"]}
+          currentStep={2}
+        />
         <p className="mt-1 text-sm text-zinc-600">
           Member: <span className="font-medium text-zinc-900">{memberName || "…"}</span>
         </p>
@@ -98,8 +104,8 @@ export default function NewMembershipPage() {
             plans={plans}
             latestActiveEndDate={latestActiveEndDate}
             onCreated={({ id }) => {
-              toast.success("Membership created");
-              router.replace(`/payments?membershipId=${id}`);
+              toast.success("Membership started ✓");
+              router.replace(`/payments?membershipId=${id}&flow=new_member`);
               router.refresh();
             }}
           />

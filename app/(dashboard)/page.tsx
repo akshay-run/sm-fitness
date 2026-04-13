@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatInTimeZone } from "date-fns-tz";
 import { loadDashboardHome } from "@/lib/queries/dashboardHome";
-import { formatAmountINR, formatDateLongIST, formatDateShortIST } from "@/lib/uiFormat";
+import { IST_TZ, parseISTDate } from "@/lib/dateUtils";
+import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 import {
   membershipRenewalReminderMessage,
   receiptMessage,
@@ -39,14 +41,16 @@ export default async function DashboardHome() {
           <h1 className="text-2xl font-semibold tracking-tight text-[#1A1A2E]">
             Dashboard
           </h1>
-          <p className="mt-1 text-sm text-slate-500">Today (IST): {formatDateLongIST(today)}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Today is {formatInTimeZone(parseISTDate(today), IST_TZ, "EEEE, d MMMM yyyy")}
+          </p>
         </div>
         <div className="flex gap-2">
           <Link
             href="/members/new"
             className="rounded-lg bg-[#1A1A2E] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
           >
-            Add member
+            New Member
           </Link>
         </div>
       </div>
@@ -130,7 +134,7 @@ export default async function DashboardHome() {
                               gymName: gymBrand,
                             })
                           )}
-                          className="status-success rounded px-2 py-1 text-xs"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           WA
                         </a>
@@ -143,7 +147,7 @@ export default async function DashboardHome() {
                               gymName: gymBrand,
                             })
                           )}
-                          className="status-info rounded px-2 py-1 text-xs"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           SMS
                         </a>
@@ -154,7 +158,7 @@ export default async function DashboardHome() {
               ) : (
                 <div className="px-3 py-8 text-center text-sm text-slate-500">
                   <div className="mb-1 text-lg">🎉</div>
-                  All memberships are current - no renewals due this week!
+                  All memberships are current — nothing expiring this week 🎉
                 </div>
               )}
             </div>
@@ -174,7 +178,7 @@ export default async function DashboardHome() {
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold text-[#1A1A2E]">Recent payments</div>
               <Link href="/payments" className="text-sm font-medium underline underline-offset-4">
-                Open payments
+                Payments
               </Link>
             </div>
             <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
@@ -195,7 +199,10 @@ export default async function DashboardHome() {
                     <div className="col-span-2 uppercase text-zinc-700">{p.payment_mode}</div>
                     <div className="col-span-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link href={`/payments/${p.id}`} className="text-sm font-medium underline">
+                        <Link
+                          href={`/payments/${p.id}`}
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium underline underline-offset-4"
+                        >
                           →
                         </Link>
                         <a
@@ -211,7 +218,7 @@ export default async function DashboardHome() {
                               mode: p.payment_mode.toUpperCase(),
                             })
                           )}
-                          className="status-success rounded px-2 py-1 text-xs"
+                          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                         >
                           WA
                         </a>
@@ -222,7 +229,7 @@ export default async function DashboardHome() {
               ) : (
                 <div className="px-3 py-8 text-center text-sm text-slate-500">
                   <div className="mb-1 text-lg">💳</div>
-                  No payments recorded yet.
+                  No payments recorded yet. Add a member and start a membership.
                 </div>
               )}
             </div>
@@ -247,7 +254,7 @@ function StatCard({
   pulse?: boolean;
 }) {
   return (
-    <div className="card-surface rounded-2xl border border-zinc-200 p-4">
+    <div className="card-surface rounded-2xl border border-zinc-200 p-5">
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-slate-500">{label}</div>
         <span className={`rounded px-2 py-1 text-xs ${tint}`}>{icon}</span>

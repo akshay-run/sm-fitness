@@ -12,6 +12,7 @@ import {
   smsLink,
   whatsappLink,
 } from "@/lib/messageTemplates";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type MemberTab = "all" | "active_membership" | "expired" | "deactivated";
 
@@ -46,7 +47,7 @@ const TAB_LABELS: { id: MemberTab; short: string }[] = [
   { id: "all", short: "All" },
   { id: "active_membership", short: "Active" },
   { id: "expired", short: "Expired" },
-  { id: "deactivated", short: "Deactivated" },
+  { id: "deactivated", short: "Archived" },
 ];
 
 export default function MembersPage() {
@@ -69,10 +70,8 @@ export default function MembersPage() {
     tabCounts: { all: 0, active_membership: 0, expired: 0, deactivated: 0 },
   };
   const [gymName, setGymName] = useState(process.env.NEXT_PUBLIC_GYM_NAME ?? "SM FITNESS");
-  const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(
-    null,
-    (_prev, id: string | null) => id
-  );
+  const [restoreTarget, setRestoreTarget] = useState<MemberListItem | null>(null);
+  const [hiddenReactivateId, setHiddenReactivateId] = useOptimistic<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,21 +198,31 @@ export default function MembersPage() {
         startTransition(() => {
           setHiddenReactivateId(null);
         });
-        toast.error(json?.error ?? "Action failed — please try again");
+        toast.error(json?.error ?? "Something went wrong. Please try again.");
         return;
       }
       startTransition(() => {
         setHiddenReactivateId(null);
       });
-      toast.success("Member reactivated ✓");
+      toast.success(`${m.full_name} is back in your active list`);
       await queryClient.invalidateQueries({ queryKey: ["members"] });
       navigate({ tab: "all", page: 1 });
     } catch {
       startTransition(() => {
         setHiddenReactivateId(null);
       });
-      toast.error("Action failed — please try again");
+      toast.error("Something went wrong. Please try again.");
     }
+  }
+
+  function emptyListMessage() {
+    if (tab === "deactivated") {
+      return "No archived members. All your members are currently active 🎉";
+    }
+    if (q.trim()) {
+      return "No members match your search. Try a different name or number.";
+    }
+    return "No members yet. Tap 'New Member' to add your first one.";
   }
 
   return (
@@ -221,27 +230,38 @@ export default function MembersPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Members</h1>
-          <p className="mt-1 text-sm text-slate-500">Search by name or mobile</p>
+          <p className="mt-1 text-sm text-slate-500">Find members by name or mobile number.</p>
         </div>
         <Link
           href="/members/new"
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
         >
-          Add member
+          New Member
         </Link>
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="w-full sm:max-w-xl">
+        <div className="relative w-full sm:max-w-xl">
           <label htmlFor="members-search" className="sr-only">
-            Search members by name or mobile
+            Search by name or mobile number
           </label>
+          <svg
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3-3" strokeLinecap="round" />
+          </svg>
           <input
             id="members-search"
             value={inputQ}
             onChange={(e) => setInputQ(e.target.value)}
-            placeholder="Search name or mobile"
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+            placeholder="e.g. Rahul or 98765..."
+            className="w-full rounded-lg border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-sm focus:border-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
           />
         </div>
 
@@ -285,11 +305,11 @@ export default function MembersPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         ) : data.items.length === 0 ? (
           <div className="rounded-xl border border-zinc-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-            No members found.
+            {emptyListMessage()}
           </div>
         ) : visibleMembers.length ? (
           visibleMembers.map((m) => (
-            <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-4">
+            <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   {m.photo_signed_url ? (
@@ -319,30 +339,22 @@ export default function MembersPage() {
                   {tab === "deactivated" ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Reactivate ${m.full_name}? They will appear in the active members list and can be assigned a new membership.`
-                          )
-                        ) {
-                          void reactivateMember(m);
-                        }
-                      }}
-                      className="rounded-lg border border-green-600 bg-green-50 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-100"
+                      onClick={() => setRestoreTarget(m)}
+                      className="rounded-lg border border-green-600 bg-white px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-50"
                     >
-                      Reactivate
+                      Restore member
                     </button>
                   ) : m.membership_status === "active" || m.membership_status === "expiring" ? (
                     <>
                       <a
                         href={whatsappLink(m.mobile, reminderForMember(m))}
-                        className="status-success rounded px-2 py-1 text-xs"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         WhatsApp
                       </a>
                       <a
                         href={smsLink(m.mobile, reminderForMember(m))}
-                        className="status-info rounded px-2 py-1 text-xs"
+                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
                       >
                         SMS
                       </a>
@@ -350,13 +362,16 @@ export default function MembersPage() {
                   ) : (
                     <Link
                       href={`/memberships/new?memberId=${m.id}`}
-                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs hover:bg-zinc-50"
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-xs hover:bg-zinc-50"
                     >
                       Renew
                     </Link>
                   )}
                 </div>
-                <Link href={`/members/${m.id}`} className="text-sm font-medium text-[#1A1A2E] underline">
+                <Link
+                  href={`/members/${m.id}`}
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium text-[#1A1A2E] underline underline-offset-4"
+                >
                   Open →
                 </Link>
               </div>
@@ -398,6 +413,25 @@ export default function MembersPage() {
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={restoreTarget != null}
+        title={restoreTarget ? `Restore ${restoreTarget.full_name}?` : ""}
+        description={
+          restoreTarget
+            ? `${restoreTarget.full_name} will appear in the active members list\nand can be assigned a new membership.`
+            : undefined
+        }
+        cancelText="Not now"
+        confirmText="Yes, restore"
+        confirmTone="success"
+        onCancel={() => setRestoreTarget(null)}
+        onConfirm={() => {
+          const t = restoreTarget;
+          setRestoreTarget(null);
+          if (t) void reactivateMember(t);
+        }}
+      />
     </div>
   );
 }
@@ -409,9 +443,11 @@ function StatusBadge({
   status: "active" | "expiring" | "expired" | "none";
   daysLeft: number | null;
 }) {
-  if (status === "active") return <span className="status-success rounded px-2 py-1 text-xs">Active</span>;
+  if (status === "active") return <span className="status-success rounded-md px-2 py-1 text-xs">Active</span>;
   if (status === "expiring")
-    return <span className="status-warning rounded px-2 py-1 text-xs">Expires in {daysLeft ?? 0} days</span>;
-  if (status === "expired") return <span className="status-danger rounded px-2 py-1 text-xs">Expired</span>;
-  return <span className="status-neutral rounded px-2 py-1 text-xs">No membership</span>;
+    return (
+      <span className="status-warning rounded-md px-2 py-1 text-xs">Expires in {daysLeft ?? 0} days</span>
+    );
+  if (status === "expired") return <span className="status-danger rounded-md px-2 py-1 text-xs">Expired</span>;
+  return <span className="status-neutral rounded-md px-2 py-1 text-xs">No membership</span>;
 }
