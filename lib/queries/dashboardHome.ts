@@ -34,13 +34,13 @@ export type DashboardRecentPaymentRow = {
   end_date: string;
 };
 
-type PaymentAmountRow = { amount: number | string | null };
+type PaymentAmountRow = { amount: number | string | null; payment_date: string };
 
 type UpcomingMembershipRow = {
   id: string;
   end_date: string;
-  members: { full_name: string; mobile: string; id: string } | null;
-  plans: { name: string } | null;
+  members: { full_name: string; mobile: string; id: string }[] | null;
+  plans: { name: string }[] | null;
 };
 
 type RecentPaymentDbRow = {
@@ -51,12 +51,12 @@ type RecentPaymentDbRow = {
   payment_date: string;
   member_id: string;
   membership_id: string;
-  members: { full_name: string; mobile: string } | null;
+  members: { full_name: string; mobile: string }[] | null;
   memberships: {
     start_date: string;
     end_date: string;
-    plans: { name: string } | null;
-  } | null;
+    plans: { name: string }[] | null;
+  }[] | null;
 };
 
 /**
@@ -137,14 +137,14 @@ export const loadDashboardHome = cache(async () => {
 
   const upcomingRows: DashboardUpcomingRow[] = [];
   for (const m of (upcomingData ?? []) as UpcomingMembershipRow[]) {
-    const member = m.members;
+    const member = m.members?.[0] ?? null;
     if (!member) continue;
     upcomingRows.push({
       membership_id: m.id,
       member_id: member.id,
       full_name: member.full_name,
       mobile: member.mobile,
-      plan_name: m.plans?.name ?? "Plan",
+      plan_name: m.plans?.[0]?.name ?? "Plan",
       end_date: String(m.end_date),
     });
   }
@@ -169,8 +169,8 @@ export const loadDashboardHome = cache(async () => {
 
   const recentRows: DashboardRecentPaymentRow[] = [];
   for (const p of (recentData ?? []) as RecentPaymentDbRow[]) {
-    const mem = p.members;
-    const ms = p.memberships;
+    const mem = p.members?.[0] ?? null;
+    const ms = p.memberships?.[0] ?? null;
     recentRows.push({
       id: p.id,
       membership_id: p.membership_id,
@@ -181,7 +181,7 @@ export const loadDashboardHome = cache(async () => {
       payment_date: p.payment_date,
       member_name: mem?.full_name ?? "Member",
       member_mobile: mem?.mobile ?? "",
-      plan_name: ms?.plans?.name ?? "Membership",
+      plan_name: ms?.plans?.[0]?.name ?? "Membership",
       start_date: ms?.start_date != null ? String(ms.start_date) : "-",
       end_date: ms?.end_date != null ? String(ms.end_date) : "-",
     });
