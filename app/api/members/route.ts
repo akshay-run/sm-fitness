@@ -37,7 +37,7 @@ type MembershipEmbed = {
   end_date: string;
   plan_id: string;
   status: string;
-  plans: { name: string } | null;
+  plans: { name: string }[] | null;
 };
 
 type MemberWithMemberships = MemberRow & {
@@ -268,7 +268,7 @@ export async function GET(req: Request) {
         created_at: m.created_at,
         welcome_wa_sent: m.welcome_wa_sent,
         photo_signed_url,
-        membership_plan_name: latest ? latest.plans?.name ?? "Membership" : null,
+        membership_plan_name: latest ? latest.plans?.[0]?.name ?? "Membership" : null,
         membership_end_date: end,
         membership_status: status,
         membership_days_left: daysLeft,

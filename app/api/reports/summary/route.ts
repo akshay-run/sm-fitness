@@ -34,13 +34,13 @@ type PaymentNestedRow = {
   membership_id: string;
   member_id: string;
   receipt_number: string;
-  members: { full_name: string; mobile: string | null } | null;
+  members: { full_name: string; mobile: string | null }[] | null;
   memberships: {
     plan_id: string;
     start_date: string;
     end_date: string;
-    plans: { name: string } | null;
-  } | null;
+    plans: { name: string }[] | null;
+  }[] | null;
 };
 
 export async function GET(req: Request) {
@@ -100,12 +100,14 @@ export async function GET(req: Request) {
   }> = [];
 
   for (const p of payRows) {
+    const member = p.members?.[0] ?? null;
+    const membership = p.memberships?.[0] ?? null;
     const amt = Number(p.amount ?? 0);
     if (p.payment_mode === "cash") cashTotal += amt;
     if (p.payment_mode === "upi") upiTotal += amt;
 
-    const planId = p.memberships?.plan_id != null ? String(p.memberships.plan_id) : null;
-    const planNameResolved = planId ? (p.memberships?.plans?.name ?? "Plan") : "—";
+    const planId = membership?.plan_id != null ? String(membership.plan_id) : null;
+    const planNameResolved = planId ? (membership?.plans?.[0]?.name ?? "Plan") : "—";
 
     if (planId) {
       const cur = planRev.get(planId) ?? {
@@ -120,11 +122,10 @@ export async function GET(req: Request) {
       planRev.set(planId, cur);
     }
 
-    const mem = p.members;
     paymentList.push({
       id: String(p.id),
-      member_name: mem?.full_name ?? "Member",
-      member_mobile: mem?.mobile ?? "—",
+      member_name: member?.full_name ?? "Member",
+      member_mobile: member?.mobile ?? "—",
       payment_date: String(p.payment_date),
       plan_name: planNameResolved,
       amount: amt,

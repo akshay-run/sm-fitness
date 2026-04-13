@@ -26,14 +26,14 @@ type PaymentJoinRow = {
     member_code: string;
     mobile: string;
     welcome_wa_sent: boolean | null;
-  } | null;
+  }[] | null;
   memberships: {
     id: string;
     plan_id: string;
     start_date: string;
     end_date: string;
-    plans: { name: string } | null;
-  } | null;
+    plans: { name: string }[] | null;
+  }[] | null;
 };
 
 export async function GET(
@@ -73,6 +73,8 @@ export async function GET(
   if (dbError || !row) return NextResponse.json({ error: dbError?.message ?? "Not found" }, { status: 404 });
 
   const r = row as PaymentJoinRow;
+  const member = r.members?.[0] ?? null;
+  const membershipRow = r.memberships?.[0] ?? null;
   const payment = {
     id: r.id,
     membership_id: r.membership_id,
@@ -86,21 +88,21 @@ export async function GET(
     notes: r.notes,
     created_at: r.created_at,
   };
-  const membership = r.memberships
+  const membership = membershipRow
     ? {
-        id: r.memberships.id,
-        plan_id: r.memberships.plan_id,
-        start_date: r.memberships.start_date,
-        end_date: r.memberships.end_date,
+        id: membershipRow.id,
+        plan_id: membershipRow.plan_id,
+        start_date: membershipRow.start_date,
+        end_date: membershipRow.end_date,
       }
     : null;
-  const plan = r.memberships?.plans ? { name: r.memberships.plans.name } : null;
+  const plan = membershipRow?.plans?.[0]?.name ? { name: membershipRow.plans[0].name } : null;
 
   const gym = await getGymDisplay(supabaseAdmin);
 
   return NextResponse.json({
     payment,
-    member: r.members,
+    member,
     membership,
     plan,
     gym,
