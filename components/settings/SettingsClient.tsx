@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 type SettingsPayload = {
@@ -25,6 +26,7 @@ const inputClass = "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm";
 const hintClass = "text-xs text-zinc-500";
 
 export function SettingsClient() {
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [gymName, setGymName] = useState("");
@@ -36,30 +38,29 @@ export function SettingsClient() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => {
       const res = await fetch("/api/settings", { cache: "no-store" });
-      const json = (await res.json()) as SettingsPayload & { error?: string };
+      const json = (await res.json().catch(() => ({}))) as SettingsPayload & { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to load settings");
-      setGymName(json.gym_name || "");
-      setAddress(json.address ?? "");
-      setPhone(json.phone ?? "");
-      setUpiId(json.upi_id ?? "");
-      setBackupEmail(json.backup_email ?? "");
-      setWhatsappGroupLink(json.whatsapp_group_link ?? "");
-      setLogoUrl(json.logo_signed_url);
-      setQrUrl(json.upi_qr_signed_url);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return json as SettingsPayload;
+    },
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!data) return;
+    setGymName(data.gym_name || "");
+    setAddress(data.address ?? "");
+    setPhone(data.phone ?? "");
+    setUpiId(data.upi_id ?? "");
+    setBackupEmail(data.backup_email ?? "");
+    setWhatsappGroupLink(data.whatsapp_group_link ?? "");
+    setLogoUrl(data.logo_signed_url);
+    setQrUrl(data.upi_qr_signed_url);
+    setLoading(false);
+  }, [data]);
 
   async function saveText(e: React.FormEvent) {
     e.preventDefault();
@@ -82,6 +83,7 @@ export function SettingsClient() {
       toast.success("Settings saved ✓");
       setLogoUrl(json.logo_signed_url ?? null);
       setQrUrl(json.upi_qr_signed_url ?? null);
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
     } catch (e: unknown) {
       toast.error(
         e instanceof Error ? e.message : "Could not save. Please check your connection."

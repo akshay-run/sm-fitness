@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { PaymentForm } from "@/components/payments/PaymentForm";
 import { FlowSteps } from "@/components/ui/FlowSteps";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
@@ -35,11 +36,6 @@ export default function PaymentsPage() {
   const membershipId = searchParams.get("membershipId") || "";
   const flowNewMember = searchParams.get("flow") === "new_member";
 
-  const [items, setItems] = useState<PaymentListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [memberName, setMemberName] = useState("");
   const [amount, setAmount] = useState<number>(0);
 
@@ -52,29 +48,27 @@ export default function PaymentsPage() {
     return sp.toString();
   }, [page]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/payments?${query}`, { cache: "no-store" });
-        const json = (await res.json().catch(() => ({}))) as PaymentsListResponse & { error?: string };
-        if (!res.ok) throw new Error(json?.error ?? "Failed to load payments");
-        if (!cancelled) {
-          setItems(json.items ?? []);
-          setTotal(json.total ?? 0);
-        }
-      } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
+  const {
+    data: paymentsData,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["payments", query],
+    queryFn: async () => {
+      const res = await fetch(`/api/payments?${query}`, { cache: "no-store" });
+      const json = (await res.json().catch(() => ({}))) as PaymentsListResponse & {
+        error?: string;
+      };
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load payments");
+      return json as PaymentsListResponse;
+    },
+    // Keep previous page visible while loading next
+    placeholderData: (prev) => prev,
+  });
+
+  const items = paymentsData?.items ?? [];
+  const total = paymentsData?.total ?? 0;
+  const error = queryError instanceof Error ? queryError.message : null;
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 type PlanRow = {
@@ -41,6 +42,7 @@ function StatusBadge({ active }: { active: boolean }) {
 }
 
 export function PlansManager() {
+  const queryClient = useQueryClient();
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -51,23 +53,26 @@ export function PlansManager() {
   const [priceError, setPriceError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data } = useQuery({
+    queryKey: ["plans", "manage"],
+    queryFn: async () => {
       const res = await fetch("/api/plans?scope=manage", { cache: "no-store" });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Failed to load plans");
-      setPlans(json.plans ?? []);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Failed to load plans");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return json as { plans?: PlanRow[] };
+    },
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!data) return;
+    setPlans(data.plans ?? []);
+    setLoading(false);
+  }, [data]);
+
+  const load = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["plans", "manage"] });
+  }, [queryClient]);
 
   async function addPlan(e: React.FormEvent) {
     e.preventDefault();

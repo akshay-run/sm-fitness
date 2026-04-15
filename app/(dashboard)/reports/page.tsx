@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
   BarChart,
@@ -110,34 +111,42 @@ function stripeBodyRow(data: CellHookData) {
 
 export default function ReportsPage() {
   const [scope, setScope] = useState<ReportScope>("this_month");
-  const [data, setData] = useState<SummaryJson | null>(null);
   const [gymName, setGymName] = useState("SM FITNESS");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [sumRes, setRes] = await Promise.all([
-        fetch(`/api/reports/summary?scope=${encodeURIComponent(scope)}`, { cache: "no-store" }),
-        fetch("/api/settings", { cache: "no-store" }),
-      ]);
-      const json = await sumRes.json();
-      if (!sumRes.ok) throw new Error(json?.error ?? "Failed to load report");
-      setData(json);
-      const sj = await setRes.json();
-      if (setRes.ok && sj.gym_name) setGymName(String(sj.gym_name));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  }, [scope]);
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["reports-summary", scope],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/summary?scope=${encodeURIComponent(scope)}`, {
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load report");
+      return json as SummaryJson;
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings", { cache: "no-store" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed to load settings");
+      return json as { gym_name?: string };
+    },
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const name = settingsData?.gym_name;
+    if (name) setGymName(String(name));
+  }, [settingsData?.gym_name]);
+
+  const error = queryError instanceof Error ? queryError.message : null;
 
   const periodLabel = useMemo(() => {
     if (!data?.period.startIST) return "All time";
