@@ -41,7 +41,11 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-export function PlansManager() {
+export function PlansManager({
+  initialPlans,
+}: {
+  initialPlans?: PlanRow[];
+}) {
   const queryClient = useQueryClient();
   const [plans, setPlans] = useState<PlanRow[]>([]);
   const [name, setName] = useState("");
@@ -60,6 +64,7 @@ export function PlansManager() {
       if (!res.ok) throw new Error(json?.error ?? "Failed to load plans");
       return json as { plans?: PlanRow[] };
     },
+    initialData: initialPlans ? { plans: initialPlans } : undefined,
     staleTime: 5 * 60_000,
   });
 

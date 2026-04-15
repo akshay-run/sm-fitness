@@ -25,7 +25,11 @@ const fieldLabelClass = "text-sm font-medium text-zinc-800";
 const inputClass = "w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm";
 const hintClass = "text-xs text-zinc-500";
 
-export function SettingsClient() {
+export function SettingsClient({
+  initialSettings,
+}: {
+  initialSettings?: SettingsPayload;
+}) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [gymName, setGymName] = useState("");
@@ -45,6 +49,7 @@ export function SettingsClient() {
       if (!res.ok) throw new Error(json.error ?? "Failed to load settings");
       return json as SettingsPayload;
     },
+    initialData: initialSettings,
     staleTime: 5 * 60_000,
   });
 
