@@ -27,7 +27,6 @@ const hintClass = "text-xs text-zinc-500";
 
 export function SettingsClient() {
   const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [gymName, setGymName] = useState("");
   const [address, setAddress] = useState("");
@@ -38,7 +37,7 @@ export function SettingsClient() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
-  const { data } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["settings"],
     queryFn: async () => {
       const res = await fetch("/api/settings", { cache: "no-store" });
@@ -59,7 +58,6 @@ export function SettingsClient() {
     setWhatsappGroupLink(data.whatsapp_group_link ?? "");
     setLogoUrl(data.logo_signed_url);
     setQrUrl(data.upi_qr_signed_url);
-    setLoading(false);
   }, [data]);
 
   async function saveText(e: React.FormEvent) {
@@ -113,9 +111,17 @@ export function SettingsClient() {
     toast.success("UPI QR updated");
   }
 
-  if (loading) {
+  if (!data && isLoading) {
     return (
       <div className="mx-auto w-full max-w-2xl p-6 text-sm text-zinc-600">Loading…</div>
+    );
+  }
+
+  if (!data && isError) {
+    return (
+      <div className="mx-auto w-full max-w-2xl p-6 text-sm text-red-700">
+        Failed to load settings. Please refresh and try again.
+      </div>
     );
   }
 

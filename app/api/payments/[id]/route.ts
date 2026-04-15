@@ -20,20 +20,38 @@ type PaymentJoinRow = {
   email_sent: boolean;
   notes: string | null;
   created_at: string;
-  members: {
-    id: string;
-    full_name: string;
-    member_code: string;
-    mobile: string;
-    welcome_wa_sent: boolean | null;
-  }[] | null;
-  memberships: {
-    id: string;
-    plan_id: string;
-    start_date: string;
-    end_date: string;
-    plans: { name: string }[] | null;
-  }[] | null;
+  members:
+    | {
+        id: string;
+        full_name: string;
+        member_code: string;
+        mobile: string;
+        welcome_wa_sent: boolean | null;
+      }
+    | {
+        id: string;
+        full_name: string;
+        member_code: string;
+        mobile: string;
+        welcome_wa_sent: boolean | null;
+      }[]
+    | null;
+  memberships:
+    | {
+        id: string;
+        plan_id: string;
+        start_date: string;
+        end_date: string;
+        plans: { name: string } | { name: string }[] | null;
+      }
+    | {
+        id: string;
+        plan_id: string;
+        start_date: string;
+        end_date: string;
+        plans: { name: string } | { name: string }[] | null;
+      }[]
+    | null;
 };
 
 export async function GET(
@@ -73,8 +91,8 @@ export async function GET(
   if (dbError || !row) return NextResponse.json({ error: dbError?.message ?? "Not found" }, { status: 404 });
 
   const r = row as PaymentJoinRow;
-  const member = r.members?.[0] ?? null;
-  const membershipRow = r.memberships?.[0] ?? null;
+  const member = Array.isArray(r.members) ? r.members[0] ?? null : r.members ?? null;
+  const membershipRow = Array.isArray(r.memberships) ? r.memberships[0] ?? null : r.memberships ?? null;
   const payment = {
     id: r.id,
     membership_id: r.membership_id,
@@ -96,7 +114,13 @@ export async function GET(
         end_date: membershipRow.end_date,
       }
     : null;
-  const plan = membershipRow?.plans?.[0]?.name ? { name: membershipRow.plans[0].name } : null;
+  const planName =
+    membershipRow?.plans == null
+      ? null
+      : Array.isArray(membershipRow.plans)
+        ? membershipRow.plans[0]?.name ?? null
+        : membershipRow.plans.name ?? null;
+  const plan = planName ? { name: planName } : null;
 
   const gym = await getGymDisplay(supabaseAdmin);
 

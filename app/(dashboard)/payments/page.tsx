@@ -51,6 +51,7 @@ export default function PaymentsPage() {
   const {
     data: paymentsData,
     isLoading: loading,
+    isFetching,
     error: queryError,
   } = useQuery({
     queryKey: ["payments", query],
@@ -64,6 +65,8 @@ export default function PaymentsPage() {
     },
     // Keep previous page visible while loading next
     placeholderData: (prev) => prev,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const items = paymentsData?.items ?? [];
@@ -161,7 +164,7 @@ export default function PaymentsPage() {
           <div className="col-span-2 text-right">Open</div>
         </div>
 
-        {loading ? (
+        {!paymentsData && loading ? (
           <div className="px-4 py-10 text-center text-sm text-zinc-600">Loading...</div>
         ) : error ? (
           <div className="px-4 py-6 text-sm text-red-700">{error}</div>
@@ -196,6 +199,10 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+
+      {isFetching && paymentsData ? (
+        <div className="mt-2 text-xs text-zinc-500">Refreshing payments…</div>
+      ) : null}
 
       <div className="mt-6 flex items-center justify-between text-sm text-zinc-700">
         <div>

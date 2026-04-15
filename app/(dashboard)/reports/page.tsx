@@ -116,6 +116,7 @@ export default function ReportsPage() {
   const {
     data,
     isLoading: loading,
+    isFetching,
     error: queryError,
   } = useQuery({
     queryKey: ["reports-summary", scope],
@@ -128,6 +129,8 @@ export default function ReportsPage() {
       return json as SummaryJson;
     },
     placeholderData: (prev) => prev,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const { data: settingsData } = useQuery({
@@ -139,6 +142,7 @@ export default function ReportsPage() {
       return json as { gym_name?: string };
     },
     staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   useEffect(() => {
@@ -429,7 +433,7 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {loading ? (
+      {!data && loading ? (
         <div className="mt-8 text-sm text-zinc-600">Loading…</div>
       ) : error ? (
         <div className="mt-8 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -533,6 +537,10 @@ export default function ReportsPage() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {isFetching && data ? (
+        <div className="mt-2 text-xs text-zinc-500">Refreshing report…</div>
       ) : null}
     </div>
   );

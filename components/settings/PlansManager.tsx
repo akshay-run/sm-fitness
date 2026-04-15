@@ -44,7 +44,6 @@ function StatusBadge({ active }: { active: boolean }) {
 export function PlansManager() {
   const queryClient = useQueryClient();
   const [plans, setPlans] = useState<PlanRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [months, setMonths] = useState("1");
   const [monthsError, setMonthsError] = useState<string | null>(null);
@@ -53,7 +52,7 @@ export function PlansManager() {
   const [priceError, setPriceError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["plans", "manage"],
     queryFn: async () => {
       const res = await fetch("/api/plans?scope=manage", { cache: "no-store" });
@@ -67,8 +66,9 @@ export function PlansManager() {
   useEffect(() => {
     if (!data) return;
     setPlans(data.plans ?? []);
-    setLoading(false);
   }, [data]);
+  const isBootLoading = !data && isLoading;
+
 
   const load = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["plans", "manage"] });
@@ -231,8 +231,12 @@ export function PlansManager() {
       </form>
 
       <div className="card-surface mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-        {loading ? (
+        {isBootLoading ? (
           <div className="px-4 py-8 text-center text-sm text-zinc-600">Loading…</div>
+        ) : !data && isError ? (
+          <div className="px-4 py-8 text-center text-sm text-red-700">
+            Failed to load plans. Please refresh and try again.
+          </div>
         ) : plans.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-zinc-600">No plans yet.</div>
         ) : (
