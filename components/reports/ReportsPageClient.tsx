@@ -139,7 +139,7 @@ export function ReportsPageClient({
   });
 
   const { data: settingsData } = useQuery({
-    queryKey: ["settings"],
+    queryKey: ["settings", "report-gym-name"],
     queryFn: async () => {
       const res = await fetch("/api/settings", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
@@ -237,13 +237,47 @@ export function ReportsPageClient({
       styles: { font: tableFont, fontSize: 8, cellPadding: PDF_CELL_PAD, textColor: [0, 0, 0], fillColor: [255, 255, 255] },
       headStyles: { font: tableFont, fontStyle: "bold", fontSize: 8, fillColor: PDF_HEADER_RGB, textColor: 255, cellPadding: PDF_CELL_PAD },
       columnStyles: { 0: { cellWidth: PAY_COL_W.member }, 1: { cellWidth: PAY_COL_W.mobile }, 2: { cellWidth: PAY_COL_W.date }, 3: { cellWidth: PAY_COL_W.plan }, 4: { cellWidth: PAY_COL_W.amount, halign: "right" }, 5: { cellWidth: PAY_COL_W.mode } },
-      didParseCell: stripeBodyRow,
+      didParseCell: (hook) => {
+        stripeBodyRow(hook);
+        if (hook.section === "head" && hook.column.index === 4) {
+          hook.cell.styles.halign = "right";
+        }
+        if (hook.section === "head" && hook.column.index === 5) {
+          hook.cell.styles.halign = "left";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
+        if (hook.section === "body" && hook.column.index === 4) {
+          hook.cell.styles.halign = "right";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
+        if (hook.section === "body" && hook.column.index === 5) {
+          hook.cell.styles.halign = "left";
+          hook.cell.styles.cellPadding = { top: 4, right: 8, bottom: 4, left: 8 };
+        }
+      },
       tableWidth: PDF_CONTENT_W,
       margin: { left: margin, right: margin },
     });
     yAfter = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
     if (data.plan_breakdown.length > 0) {
-      const planBody = data.plan_breakdown.map((r) => [r.plan_name, String(r.member_count), String(r.payment_count), pdfAmount(r.revenue), r.member_count > 0 ? pdfAmount(r.revenue / r.member_count) : "—"]);
+      const planBody = data.plan_breakdown.map((r) => [
+        r.plan_name,
+        String(r.member_count),
+        String(r.payment_count),
+        pdfAmount(r.revenue),
+        r.member_count > 0 ? pdfAmount(r.revenue / r.member_count) : "—",
+      ]);
+      const totalMembers = data.plan_breakdown.reduce((sum, r) => sum + r.member_count, 0);
+      const totalPayments = data.plan_breakdown.reduce((sum, r) => sum + r.payment_count, 0);
+      const totalRevenue = data.plan_breakdown.reduce((sum, r) => sum + r.revenue, 0);
+      planBody.push([
+        "Total",
+        String(totalMembers),
+        String(totalPayments),
+        pdfAmount(totalRevenue),
+        totalMembers > 0 ? pdfAmount(totalRevenue / totalMembers) : "—",
+      ]);
+      const lastPlanRowIndex = planBody.length - 1;
       autoTable(doc, {
         startY: yAfter,
         theme: "plain",
@@ -252,7 +286,22 @@ export function ReportsPageClient({
         styles: { font: tableFont, fontSize: 8, cellPadding: PDF_CELL_PAD, textColor: [0, 0, 0], fillColor: [255, 255, 255] },
         headStyles: { font: tableFont, fontStyle: "bold", fontSize: 8, fillColor: PDF_HEADER_RGB, textColor: 255, cellPadding: PDF_CELL_PAD },
         columnStyles: { 0: { cellWidth: PLAN_COL_W.plan }, 1: { cellWidth: PLAN_COL_W.members }, 2: { cellWidth: PLAN_COL_W.payments }, 3: { cellWidth: PLAN_COL_W.revenue, halign: "right" }, 4: { cellWidth: PLAN_COL_W.avg, halign: "right" } },
-        didParseCell: stripeBodyRow,
+        didParseCell: (hook) => {
+          stripeBodyRow(hook);
+          if (hook.section === "head" && (hook.column.index === 3 || hook.column.index === 4)) {
+            hook.cell.styles.halign = "right";
+          }
+          if (hook.section === "body" && hook.column.index === 3) {
+            hook.cell.styles.halign = "right";
+          }
+          if (hook.section === "body" && hook.column.index === 4) {
+            hook.cell.styles.halign = "right";
+          }
+          if (hook.section === "body" && hook.row.index === lastPlanRowIndex) {
+            hook.cell.styles.fontStyle = "bold";
+            hook.cell.styles.fillColor = [255, 255, 255];
+          }
+        },
         tableWidth: PDF_CONTENT_W,
         margin: { left: margin, right: margin },
       });

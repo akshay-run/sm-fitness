@@ -16,13 +16,24 @@ type PaymentNestedRow = {
   payment_date: string;
   membership_id: string;
   member_id: string;
-  members: { full_name: string; mobile: string | null }[] | null;
-  memberships: {
-    plan_id: string;
-    start_date: string;
-    end_date: string;
-    plans: { name: string }[] | null;
-  }[] | null;
+  members:
+    | { full_name: string; mobile: string | null }
+    | { full_name: string; mobile: string | null }[]
+    | null;
+  memberships:
+    | {
+        plan_id: string;
+        start_date: string;
+        end_date: string;
+        plans: { name: string }[] | { name: string } | null;
+      }
+    | {
+        plan_id: string;
+        start_date: string;
+        end_date: string;
+        plans: { name: string }[] | { name: string } | null;
+      }[]
+    | null;
 };
 
 function monthKeyIST(d: Date) {
@@ -71,13 +82,18 @@ export default async function ReportsPage() {
   const paymentList: SummaryJson["payments"] = [];
 
   for (const p of payRows) {
-    const member = p.members?.[0] ?? null;
-    const membership = p.memberships?.[0] ?? null;
+    const member = Array.isArray(p.members) ? p.members[0] ?? null : p.members ?? null;
+    const membership = Array.isArray(p.memberships) ? p.memberships[0] ?? null : p.memberships ?? null;
     const amt = Number(p.amount ?? 0);
     if (p.payment_mode === "cash") cashTotal += amt;
     if (p.payment_mode === "upi") upiTotal += amt;
     const planId = membership?.plan_id != null ? String(membership.plan_id) : null;
-    const planNameResolved = planId ? (membership?.plans?.[0]?.name ?? "Plan") : "—";
+    const planNameResolved = (() => {
+      if (!planId) return "—";
+      const plans = membership?.plans ?? null;
+      if (Array.isArray(plans)) return plans[0]?.name ?? "Plan";
+      return plans?.name ?? "Plan";
+    })();
     if (planId) {
       const cur = planRev.get(planId) ?? {
         name: planNameResolved,

@@ -149,7 +149,6 @@ export function PaymentsPageClient({
             memberName={memberName || "—"}
             onCreated={(paymentId) => {
               router.replace(`/payments/${paymentId}`);
-              router.refresh();
             }}
           />
         </div>

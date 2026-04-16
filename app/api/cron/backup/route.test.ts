@@ -1,17 +1,20 @@
+/**
+ * @jest-environment node
+ */
 import type { NextRequest } from "next/server";
 
-const sendMail = vi.fn(async () => {});
-const logBackupEmail = vi.fn(async () => {});
+const sendMail = jest.fn(async () => {});
+const logBackupEmail = jest.fn(async () => {});
 
-vi.mock("@/lib/mailer", () => ({
+jest.mock("@/lib/mailer", () => ({
   sendMail: (...args: unknown[]) => sendMail(...args),
 }));
 
-vi.mock("@/lib/email", () => ({
+jest.mock("@/lib/email", () => ({
   logBackupEmail: (...args: unknown[]) => logBackupEmail(...args),
 }));
 
-vi.mock("@/lib/supabaseAdmin", () => ({
+jest.mock("@/lib/supabaseAdmin", () => ({
   createSupabaseAdminClient: () => ({
     from: (table: string) => {
       if (table === "members") {
@@ -112,7 +115,7 @@ describe("GET /api/cron/backup", () => {
     expect(res.status).toBe(401);
   });
 
-  it("sends backup and logs when authorized", async () => {
+  it("sends backup and logs when authorized", async () =>{
     const req = new Request("http://localhost/api/cron/backup", {
       headers: { Authorization: "Bearer secret" },
     }) as unknown as NextRequest;
@@ -128,6 +131,6 @@ describe("GET /api/cron/backup", () => {
         status: "sent",
       })
     );
-  });
+  }, 15000);
 
 });

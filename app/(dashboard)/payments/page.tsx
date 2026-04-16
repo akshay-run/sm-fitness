@@ -3,6 +3,17 @@ import { PaymentsPageClient, type PaymentsListResponse } from "@/components/paym
 
 const PAGE_SIZE = 25;
 
+function toBooleanStrict(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "") return false;
+  }
+  return false;
+}
+
 export default async function PaymentsPage({
   searchParams,
 }: {
@@ -46,7 +57,7 @@ export default async function PaymentsPage({
       payment_mode: String((row as { payment_mode: string }).payment_mode) as "cash" | "upi",
       payment_date: String((row as { payment_date: string }).payment_date),
       receipt_number: String((row as { receipt_number: string }).receipt_number),
-      email_sent: Boolean((row as { email_sent: boolean }).email_sent),
+      email_sent: toBooleanStrict((row as { email_sent: unknown }).email_sent),
       created_at: String((row as { created_at: string }).created_at),
       members: member
         ? {

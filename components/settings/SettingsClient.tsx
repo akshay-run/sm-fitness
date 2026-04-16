@@ -42,7 +42,7 @@ export function SettingsClient({
   const [qrUrl, setQrUrl] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["settings"],
+    queryKey: ["settings", "full"],
     queryFn: async () => {
       const res = await fetch("/api/settings", { cache: "no-store" });
       const json = (await res.json().catch(() => ({}))) as SettingsPayload & { error?: string };

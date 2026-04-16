@@ -177,6 +177,7 @@ export async function GET(request: NextRequest) {
     status: RowStatus;
     sortEnd: string;
     sortDays: number;
+    lastPaidSortTs: number;
   };
 
   const rows: TableRow[] = [];
@@ -219,6 +220,7 @@ export async function GET(request: NextRequest) {
     const lastPaid = lp ? formatInTimeZone(new Date(lp.payment_date), IST_TZ, "dd MMM yyyy") : "—";
     const amount = lp ? formatInr(Number(lp.amount ?? 0)) : "—";
     const mode = lp ? String(lp.payment_mode).toUpperCase() : "—";
+    const lastPaidSortTs = lp ? new Date(lp.payment_date).getTime() : 0;
     const daysLeftStr =
       !lm ? "—" : status === "expired" ? String(daysLeftNum) : String(daysLeftNum);
 
@@ -234,19 +236,18 @@ export async function GET(request: NextRequest) {
       status,
       sortEnd: lm ? String(lm.end_date) : "",
       sortDays: daysLeftNum,
+      lastPaidSortTs,
     });
   }
 
   const total = (members ?? []).length;
 
   rows.sort((a, b) => {
+    if (a.lastPaidSortTs !== b.lastPaidSortTs) return b.lastPaidSortTs - a.lastPaidSortTs;
+    if (a.sortEnd !== b.sortEnd) return b.sortEnd.localeCompare(a.sortEnd);
     const ta = tier(a.status);
     const tb = tier(b.status);
     if (ta !== tb) return ta - tb;
-    if (a.status === "expired") return a.sortEnd.localeCompare(b.sortEnd);
-    if (a.status === "expiring_soon") return a.sortDays - b.sortDays;
-    if (a.status === "no_membership") return a.name.localeCompare(b.name);
-    if (a.status === "active") return b.sortEnd.localeCompare(a.sortEnd);
     return a.name.localeCompare(b.name);
   });
 

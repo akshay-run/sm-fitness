@@ -23,7 +23,6 @@ export default function NewMemberPage() {
 
     toast.success("Member added successfully ✓");
     router.replace(`/members/${json.id}`);
-    router.refresh();
   }
 
   return (

@@ -203,6 +203,9 @@ describe("members route", () => {
     const json = await res.json();
     expect(Array.isArray(json.items)).toBe(true);
     expect(json.tabCounts).toBeDefined();
+    expect(json.items[0]).not.toHaveProperty("password");
+    expect(json.items[0]).not.toHaveProperty("password_hash");
+    expect(json.items[0]).not.toHaveProperty("token");
   });
 
   it("POST creates member with generated code", async () => {

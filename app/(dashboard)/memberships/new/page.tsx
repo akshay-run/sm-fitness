@@ -106,7 +106,6 @@ export default function NewMembershipPage() {
             onCreated={({ id }) => {
               toast.success("Membership started ✓");
               router.replace(`/payments?membershipId=${id}&flow=new_member`);
-              router.refresh();
             }}
           />
         </div>
