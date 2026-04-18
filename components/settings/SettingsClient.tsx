@@ -86,7 +86,7 @@ export function SettingsClient({
       toast.success("Settings saved ✓");
       setLogoUrl(json.logo_signed_url ?? null);
       setQrUrl(json.upi_qr_signed_url ?? null);
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await queryClient.invalidateQueries({ queryKey: ["settings", "full"] });
     } catch (e: unknown) {
       toast.error(
         e instanceof Error ? e.message : "Could not save. Please check your connection."
