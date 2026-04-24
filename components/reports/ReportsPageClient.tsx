@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -115,7 +115,6 @@ export function ReportsPageClient({
   initialGymName: string;
 }) {
   const [scope, setScope] = useState<ReportScope>(initialSummary.scope);
-  const [gymName, setGymName] = useState(initialGymName);
 
   const {
     data,
@@ -151,10 +150,7 @@ export function ReportsPageClient({
     gcTime: 30 * 60_000,
   });
 
-  useEffect(() => {
-    const name = settingsData?.gym_name;
-    if (name) setGymName(String(name));
-  }, [settingsData?.gym_name]);
+  const gymName = settingsData?.gym_name ? String(settingsData.gym_name) : initialGymName;
 
   const error = queryError instanceof Error ? queryError.message : null;
 
@@ -169,7 +165,6 @@ export function ReportsPageClient({
     if (!data) return;
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const margin = PDF_MARGIN;
-    const pageW = doc.internal.pageSize.getWidth();
     const notoOk = await embedNotoSans(doc);
     const tableFont = notoOk ? "NotoSans" : "helvetica";
     const pdfAmount = (v: number | string) => (notoOk ? formatAmountPdfINR(v) : formatAmountPdfAscii(v));

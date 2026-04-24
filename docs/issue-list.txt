@@ -1,102 +1,107 @@
-issue 0: 
-Console Error
+D:\sm-fitness\cursor>npm run lint
+
+> cursor@0.1.0 lint
+> eslint
 
 
-A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
+D:\sm-fitness\cursor\components\reports\ReportsPageClient.tsx
+  156:15  error    Error: Calling setState synchronously within an effect can trigger cascading renders
 
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
 
-See more info here: https://nextjs.org/docs/messages/react-hydration-error
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
 
+D:\sm-fitness\cursor\components\reports\ReportsPageClient.tsx:156:15
+  154 |   useEffect(() => {
+  155 |     const name = settingsData?.gym_name;
+> 156 |     if (name) setGymName(String(name));
+      |               ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  157 |   }, [settingsData?.gym_name]);
+  158 |
+  159 |   const error = queryError instanceof Error ? queryError.message : null;  react-hooks/set-state-in-effect
+  172:11  warning  'pageW' is assigned a value but never used                
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                                                             
+                                        @typescript-eslint/no-unused-vars    
 
-+
-Client
--
-Server
-  ...
-    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
-      <AppDevOverlayErrorBoundary globalError={[...]}>
-        <ReplaySsrOnlyErrors>
-        <DevRootHTTPAccessFallbackBoundary>
-          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
-            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
-              <RedirectBoundary>
-                <RedirectErrorBoundary router={{...}}>
-                  <Head>
-                  <__next_root_layout_boundary__>
-                    <SegmentViewNode type="layout" pagePath="layout.tsx">
-                      <SegmentTrieNode>
-                      <link>
-                      <script>
-                      <script>
-                      <script>
-                      <RootLayout>
-                        <html lang="en" className="geist_a715...">
-                          <body
-                            className="min-h-full flex flex-col"
--                           __processed_0241064c-4e5c-4af2-b38f-873eafecc15f__="true"
--                           bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWll..."
-                          >
-                  ...
-app\layout.tsx (38:7) @ RootLayout
+D:\sm-fitness\cursor\components\settings\SettingsClient.tsx
+  3:10  warning  'useCallback' is defined but never used  @typescript-eslint/no-unused-vars
 
+D:\sm-fitness\cursor\coverage\lcov-report\block-navigation.js
+  1:1  warning  Unused eslint-disable directive (no problems were reported)  
 
-  36 |       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-  37 |     >
-> 38 |       <body className="min-h-full flex flex-col">
-     |       ^
-  39 |         <SWRegister />
-  40 |         <InstallPrompt />
-  41 |         {children}
-Call Stack
-18
-
-Show 16 ignore-listed frame(s)
-body
-<anonymous>
-RootLayout
-app\layout.tsx (38:7)
-
-issue 1:while creating new member showing red erro: failed to create member
-network:
-header;Request URL:http://localhost:3000/api/members
-Request Method:POST
-Status Code:500 Internal Server Error
-Remote Address:[::1]:300
-
-payload:
-{full_name: "Shubham Nikule", mobile: "8087234723", email: "shubhamnikule1404@gmail.com",…}
-address
-: 
-"harsul, chetana nagar"
-date_of_birth
-: 
-"2005-07-09"
-email
-: 
-"shubhamnikule1404@gmail.com"
-emergency_contact_name
-: 
-""
-full_name
-: 
-"Shubham Nikule"
-gender
-: 
-"male"
-mobile
-: 
-"8087234723"
-notes
-: 
-""
-
-console: requests.js:1  POST http://localhost:3000/api/members 500 (Internal Server Error)
+✖ 4 problems (1 error, 3 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.        
 
 
-issue 3: Could not find the table 'public.members' in the schema cache
+D:\sm-fitness\cursor>npm run build
+
+> cursor@0.1.0 build
+> next build
+
+▲ Next.js 16.2.2 (Turbopack)
+- Environments: .env
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 11.4s
+✓ Finished TypeScript in 8.5s    
+✓ Collecting page data using 7 workers in 1759ms
+✓ Generating static pages using 7 workers (28/28) in 6.5s
+✓ Finalizing page optimization in 65ms    
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/cron/backup
+├ ƒ /api/cron/reminders
+├ ƒ /api/email
+├ ƒ /api/members
+├ ƒ /api/members/[id]
+├ ƒ /api/members/[id]/photo
+├ ƒ /api/memberships
+├ ƒ /api/memberships/[id]
+├ ƒ /api/payments
+├ ƒ /api/payments/[id]
+├ ƒ /api/payments/[id]/resend
+├ ƒ /api/plans
+├ ƒ /api/plans/[id]
+├ ƒ /api/reports/members-csv
+├ ƒ /api/reports/revenue
+├ ƒ /api/reports/summary
+├ ƒ /api/settings
+├ ƒ /api/settings/logo
+├ ƒ /api/settings/upi-qr
+├ ƒ /auth/callback
+├ ○ /auth/reset-password
+├ ○ /forgot-password
+├ ○ /login
+├ ƒ /members
+├ ƒ /members/[id]
+├ ƒ /members/[id]/edit
+├ ƒ /members/new
+├ ƒ /memberships/new
+├ ƒ /payments
+├ ƒ /payments/[id]
+├ ƒ /reports
+├ ƒ /settings
+└ ○ /update-password
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
