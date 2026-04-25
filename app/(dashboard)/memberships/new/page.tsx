@@ -79,7 +79,7 @@ export default function NewMembershipPage() {
         </h1>
         <FlowSteps
           steps={["Add member", "Start membership", "Record payment"]}
-          shortLabels={["Member", "Membership", "Payment"]}
+          shortLabels={["Info", "Plan", "Pay"]}
           currentStep={2}
         />
         <p className="mt-1 text-sm text-zinc-600">

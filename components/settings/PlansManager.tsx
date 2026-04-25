@@ -163,6 +163,35 @@ export function PlansManager({
     }
   }
 
+  async function activate(id: string) {
+    try {
+      const res = await fetch(`/api/plans/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "Failed");
+      toast.success("Plan activated");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    }
+  }
+
+  async function deletePlan(id: string) {
+    if (!confirm("Delete this plan permanently? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/plans/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "Failed");
+      toast.success("Plan deleted");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 md:px-6">
       <h2 className="text-lg font-semibold text-zinc-900">Plans</h2>
@@ -173,9 +202,10 @@ export function PlansManager({
       <form onSubmit={addPlan} className="card-surface mt-4 space-y-3 rounded-2xl border border-zinc-200 bg-white p-5">
         <div className="text-sm font-medium text-zinc-800">Add plan</div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
+            <label className="block text-xs font-medium text-zinc-700">Plan name</label>
             <input
-              className={`rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!nameError)}`}
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!nameError)}`}
               placeholder="Name"
               value={name}
               aria-invalid={!!nameError}
@@ -186,7 +216,8 @@ export function PlansManager({
             />
             {nameError ? <p className="text-xs text-red-600">{nameError}</p> : null}
           </div>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
+            <label className="block text-xs font-medium text-zinc-700">Duration (months)</label>
             <input
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
               type="number"
@@ -210,13 +241,14 @@ export function PlansManager({
             />
             {monthsError ? <p className="text-xs text-red-600">{monthsError}</p> : null}
           </div>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
+            <label className="block text-xs font-medium text-zinc-700">Fee (optional)</label>
             <input
-              className={`rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!priceError)}`}
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${inputInvalidClass(!!priceError)}`}
               type="number"
               min={0}
               step="0.01"
-              placeholder="Fee (optional)"
+              placeholder="Fee"
               value={price}
               aria-invalid={!!priceError}
               onChange={(e) => {
@@ -229,7 +261,7 @@ export function PlansManager({
         </div>
         <button
           type="submit"
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
         >
           Add plan
         </button>
@@ -265,6 +297,8 @@ export function PlansManager({
                   onCancel={() => setEditingId(null)}
                   onSave={saveEdit}
                   onDeactivate={deactivate}
+                  onActivate={activate}
+                  onDelete={deletePlan}
                   desktopGrid={desktopGrid}
                   validateDuration={validatePlanDuration}
                 />
@@ -284,6 +318,8 @@ function PlanRowItem({
   onCancel,
   onSave,
   onDeactivate,
+  onActivate,
+  onDelete,
   desktopGrid,
   validateDuration,
 }: {
@@ -293,6 +329,8 @@ function PlanRowItem({
   onCancel: () => void;
   onSave: (p: PlanRow) => void;
   onDeactivate: (id: string) => void;
+  onActivate: (id: string) => void;
+  onDelete: (id: string) => void;
   desktopGrid: string;
   validateDuration: (months: number) => string | null;
 }) {
@@ -310,6 +348,7 @@ function PlanRowItem({
   }
 
   const feeLabel = plan.default_price != null ? `₹${plan.default_price}` : "—";
+  const durationLabel = `${plan.duration_months} ${plan.duration_months === 1 ? "month" : "months"}`;
 
   if (editing) {
     return (
@@ -434,31 +473,55 @@ function PlanRowItem({
           <StatusBadge active={plan.is_active} />
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-600">
-          <span>{plan.duration_months} months</span>
+          <span>{durationLabel}</span>
           <span aria-hidden>·</span>
           <span>{feeLabel}</span>
         </div>
-        {plan.is_active ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="text-xs underline" onClick={onEdit}>
-              Edit
-            </button>
-            <button
-              type="button"
-              className="rounded border border-red-300 px-2 py-1 text-xs text-red-600"
-              onClick={() => onDeactivate(plan.id)}
-            >
-              Deactivate
-            </button>
-          </div>
-        ) : (
-          <span className="text-xs text-zinc-400">—</span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {plan.is_active ? (
+            <>
+              <button type="button" className="text-xs underline" onClick={onEdit}>
+                Edit
+              </button>
+              <button
+                type="button"
+                className="rounded border border-red-300 px-2 py-1 text-xs text-red-600"
+                onClick={() => onDeactivate(plan.id)}
+              >
+                Deactivate
+              </button>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                onClick={() => onDelete(plan.id)}
+              >
+                Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="rounded border border-green-300 px-2 py-1 text-xs text-green-700"
+                onClick={() => onActivate(plan.id)}
+              >
+                Activate
+              </button>
+              <button
+                type="button"
+                className="rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                onClick={() => onDelete(plan.id)}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className={`hidden px-4 py-3 text-sm ${desktopGrid}`}>
         <div className="truncate font-medium text-zinc-900">{plan.name}</div>
-        <div>{plan.duration_months}</div>
+        <div>{durationLabel}</div>
         <div className="truncate">{feeLabel}</div>
         <div className="min-w-0 overflow-hidden">
           <StatusBadge active={plan.is_active} />
@@ -476,9 +539,31 @@ function PlanRowItem({
               >
                 Deactivate
               </button>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                onClick={() => onDelete(plan.id)}
+              >
+                Delete
+              </button>
             </>
           ) : (
-            <span className="text-xs text-zinc-400">—</span>
+            <>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-green-300 px-2 py-1 text-xs text-green-700"
+                onClick={() => onActivate(plan.id)}
+              >
+                Activate
+              </button>
+              <button
+                type="button"
+                className="shrink-0 rounded border border-zinc-300 px-2 py-1 text-xs text-zinc-700"
+                onClick={() => onDelete(plan.id)}
+              >
+                Delete
+              </button>
+            </>
           )}
         </div>
       </div>

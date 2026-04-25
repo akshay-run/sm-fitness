@@ -156,9 +156,11 @@ export function ReportsPageClient({
 
   const periodLabel = useMemo(() => {
     if (!data?.period.startIST) return "All time";
-    const a = data.period.startIST.slice(0, 10);
-    const b = data.period.endIST ? new Date(data.period.endIST).toISOString().slice(0, 10) : "";
-    return `${a} to ${b}`;
+    const start = data.period.startIST.slice(0, 10);
+    const endDate = data.period.endIST ? new Date(data.period.endIST) : null;
+    if (endDate) endDate.setUTCDate(endDate.getUTCDate() - 1);
+    const end = endDate ? endDate.toISOString().slice(0, 10) : "";
+    return `${formatDateShortIST(start)} – ${formatDateShortIST(end)}`;
   }, [data]);
 
   const exportPdf = useCallback(async () => {
@@ -306,21 +308,13 @@ export function ReportsPageClient({
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Reports</h1>
           <p className="mt-1 text-sm text-zinc-600">
             Revenue, payments, plan mix, and member growth for the selected period.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void exportPdf()}
-          disabled={!data || loading}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
-        >
-          Export PDF
-        </button>
       </div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="space-y-1">
@@ -341,6 +335,14 @@ export function ReportsPageClient({
         ) : (
           <p className="text-xs text-zinc-500">All recorded data</p>
         )}
+        <button
+          type="button"
+          onClick={() => void exportPdf()}
+          disabled={!data || loading}
+          className="sm:ml-auto rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          Export PDF
+        </button>
       </div>
       {!data && loading ? (
         <div className="mt-8 text-sm text-zinc-600">Loading…</div>
@@ -348,12 +350,14 @@ export function ReportsPageClient({
         <div className="mt-8 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       ) : data ? (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Stat label="Payments" value={String(data.summary.payment_count)} />
             <Stat label="Cash" value={formatAmountINR(data.summary.cash_total)} />
             <Stat label="UPI" value={formatAmountINR(data.summary.upi_total)} />
             <Stat label="Total" value={formatAmountINR(data.summary.grand_total)} emphasize />
-            <Stat label="New members" value={String(data.summary.new_members)} />
+          </div>
+          <div className="mt-3">
+            <Stat label="New members" value={String(data.summary.new_members)} wide />
           </div>
           <div className="card-surface mt-8 rounded-2xl border border-zinc-200 bg-white p-5">
             <h2 className="text-base font-semibold text-zinc-900">Payments</h2>
@@ -449,13 +453,15 @@ function Stat({
   label,
   value,
   emphasize,
+  wide,
 }: {
   label: string;
   value: string;
   emphasize?: boolean;
+  wide?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+    <div className={`rounded-2xl border border-zinc-200 bg-white p-4 ${wide ? "w-full" : ""}`}>
       <div className="text-xs font-medium text-zinc-500">{label}</div>
       <div className={`mt-1 text-lg font-semibold tracking-tight text-zinc-900 ${emphasize ? "text-xl" : ""}`}>
         {value}

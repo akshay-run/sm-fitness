@@ -52,7 +52,16 @@ type RecentPaymentDbRow = {
   payment_date: string;
   member_id: string;
   membership_id: string;
-  members: { full_name: string; mobile: string }[] | null;
+  members:
+    | {
+        full_name: string | null;
+        mobile: string | null;
+      }
+    | {
+        full_name: string | null;
+        mobile: string | null;
+      }[]
+    | null;
   memberships: {
     start_date: string;
     end_date: string;
@@ -201,7 +210,8 @@ export const loadDashboardHome = cache(async () => {
 
   const recentRows: DashboardRecentPaymentRow[] = [];
   for (const p of (recentData ?? []) as RecentPaymentDbRow[]) {
-    const mem = p.members?.[0] ?? null;
+    const memRaw = p.members ?? null;
+    const mem = Array.isArray(memRaw) ? (memRaw[0] ?? null) : memRaw;
     const ms = p.memberships?.[0] ?? null;
     recentRows.push({
       id: p.id,

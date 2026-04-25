@@ -51,3 +51,40 @@ export async function PATCH(
   if (dbError) return internalServerError(dbError.message);
   return NextResponse.json({ plan: data });
 }
+
+export async function DELETE(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { user, error } = await requireUser();
+  if (!user) return NextResponse.json({ error }, { status: 401 });
+
+  const params = await ctx.params;
+  const parsedParams = paramsSchema.safeParse(params);
+  if (!parsedParams.success) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  const supabaseAdmin = createSupabaseAdminClient();
+
+  const { count: usageCount, error: usageError } = await supabaseAdmin
+    .from("memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("plan_id", parsedParams.data.id);
+
+  if (usageError) return internalServerError(usageError.message);
+  if ((usageCount ?? 0) > 0) {
+    return NextResponse.json(
+      { error: "Cannot delete this plan because it is used in membership records." },
+      { status: 400 }
+    );
+  }
+
+  const { error: dbError } = await supabaseAdmin
+    .from("plans")
+    .delete()
+    .eq("id", parsedParams.data.id);
+
+  if (dbError) return internalServerError(dbError.message);
+  return NextResponse.json({ ok: true });
+}

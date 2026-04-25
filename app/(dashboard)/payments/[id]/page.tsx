@@ -172,22 +172,24 @@ export default function PaymentDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-3xl p-6">
+      <div className="mb-3">
+        <Link
+          href="/payments"
+          className="inline-flex items-center gap-1 text-sm font-medium text-zinc-700 hover:text-zinc-900 print:hidden"
+        >
+          <span aria-hidden>←</span> Back
+        </Link>
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            {payment.receipt_number}
+            Payment Receipt
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Mode: <span className="font-medium">{payment.payment_mode}</span> • Amount:{" "}
+            {payment.receipt_number} • Mode: <span className="font-medium">{payment.payment_mode}</span> • Amount:{" "}
             <span className="font-medium">₹{payment.amount}</span>
           </p>
         </div>
-        <Link
-          href="/payments"
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50 print:hidden"
-        >
-          Back
-        </Link>
       </div>
 
       <div className={`mt-4 inline-flex rounded px-3 py-1 text-xs ${badgeClass}`}>{badgeText}</div>
@@ -197,6 +199,31 @@ export default function PaymentDetailPage({
           {info}
         </div>
       ) : null}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 print:hidden">
+        {showWelcomeWa && member ? (
+          <a
+            href={whatsappLink(member.mobile, welcomeMessage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              void markWelcomeSent(member.id);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-green-600 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+          >
+            <WhatsAppGlyph className="h-4 w-4 shrink-0" />
+            Send welcome on WhatsApp 👋
+          </a>
+        ) : null}
+        {member ? (
+          <a
+            href={whatsappLink(member.mobile, shareMessage)}
+            className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          >
+            Share on WhatsApp
+          </a>
+        ) : null}
+      </div>
 
       <div className="card-surface mt-6 rounded-2xl border border-zinc-200 p-5">
         {gym?.logo_signed_url ? (
@@ -208,7 +235,19 @@ export default function PaymentDetailPage({
               className="max-h-16 w-auto object-contain"
             />
           </div>
-        ) : null}
+        ) : (
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
+              {(gym?.gym_name ?? "SM FITNESS")
+                .split(" ")
+                .map((w) => w[0] ?? "")
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()}
+            </div>
+            <p className="text-xs text-zinc-500">Add your logo in Settings for branded receipts.</p>
+          </div>
+        )}
         <div className="text-xl font-semibold text-[#1A1A2E]">{gym?.gym_name ?? "SM FITNESS"}</div>
         <div className="text-sm text-slate-500">Payment Receipt</div>
         {gym?.address ? (
@@ -246,20 +285,6 @@ export default function PaymentDetailPage({
         >
           Print receipt
         </button>
-        {showWelcomeWa && member ? (
-          <a
-            href={whatsappLink(member.mobile, welcomeMessage)}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              void markWelcomeSent(member.id);
-            }}
-            className="inline-flex items-center gap-2 rounded-lg border-2 border-green-600 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
-          >
-            <WhatsAppGlyph className="h-4 w-4 shrink-0" />
-            Send welcome on WhatsApp 👋
-          </a>
-        ) : null}
         <button
           type="button"
           onClick={async () => {
@@ -284,12 +309,6 @@ export default function PaymentDetailPage({
         </button>
         {member ? (
           <>
-            <a
-              href={whatsappLink(member.mobile, shareMessage)}
-              className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-            >
-              WhatsApp
-            </a>
             <a
               href={smsLink(member.mobile, shareMessage)}
               className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"

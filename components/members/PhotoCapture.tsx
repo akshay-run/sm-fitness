@@ -13,6 +13,7 @@ type Props = {
 export function PhotoCapture({ memberId, existingUrl, onUploaded }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<"upload" | "camera">("upload");
   const [previewUrl, setPreviewUrl] = useState<string | null>(existingUrl ?? null);
@@ -118,7 +119,7 @@ export function PhotoCapture({ memberId, existingUrl, onUploaded }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-zinc-900">Photo</div>
-          <div className="text-xs text-zinc-600">Compressed to &lt; 200KB</div>
+          <div className="text-xs text-zinc-600">Images are compressed automatically</div>
         </div>
         <div className="flex gap-2">
           <button
@@ -132,11 +133,24 @@ export function PhotoCapture({ memberId, existingUrl, onUploaded }: Props) {
             onClick={() => {
               stopCamera();
               setMode("upload");
+              fileInputRef.current?.click();
             }}
             disabled={busy}
           >
             Upload
           </button>
+          <input
+            ref={fileInputRef}
+            className="hidden"
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void onFilePicked(f);
+            }}
+            disabled={busy}
+          />
           <button
             type="button"
             className={[
@@ -161,35 +175,30 @@ export function PhotoCapture({ memberId, existingUrl, onUploaded }: Props) {
           <div className="text-xs font-medium text-zinc-700">Preview</div>
           <div className="mt-3 flex items-center justify-center">
             {previewUrl ? (
-              <div className="relative h-40 w-40 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+              <div className="relative h-24 w-24 overflow-hidden rounded-full border border-zinc-200 bg-white">
                 <Image src={previewUrl} alt="Member photo" fill className="object-cover" />
               </div>
             ) : (
-              <div className="h-40 w-40 rounded-xl border border-dashed border-zinc-300 bg-white flex items-center justify-center text-xs text-zinc-500">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full border border-dashed border-zinc-300 bg-white text-sm font-medium text-zinc-500">
                 No photo
               </div>
             )}
           </div>
+          {mode === "upload" ? (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {busy ? "Working..." : "Choose image"}
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {mode === "upload" ? (
-          <div className="rounded-xl border border-zinc-200 p-3">
-            <div className="text-xs font-medium text-zinc-700">Upload</div>
-            <p className="mt-2 text-xs text-zinc-600">
-              Choose an image. We’ll compress it before upload.
-            </p>
-            <input
-              className="mt-3 block w-full text-xs"
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void onFilePicked(f);
-              }}
-              disabled={busy}
-            />
-          </div>
-        ) : (
+        {mode === "camera" ? (
           <div className="rounded-xl border border-zinc-200 p-3">
             <div className="text-xs font-medium text-zinc-700">Camera</div>
             <div className="mt-3 overflow-hidden rounded-lg border border-zinc-200 bg-black">
@@ -216,6 +225,11 @@ export function PhotoCapture({ memberId, existingUrl, onUploaded }: Props) {
                 Stop
               </button>
             </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+            Tap <span className="font-medium">Choose image</span> to upload from gallery, or switch to{" "}
+            <span className="font-medium">Camera</span> to capture a new photo.
           </div>
         )}
       </div>

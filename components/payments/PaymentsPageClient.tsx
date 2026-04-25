@@ -127,18 +127,20 @@ export function PaymentsPageClient({
           {flowNewMember ? (
             <FlowSteps
               steps={["Add member", "Start membership", "Record payment"]}
-              shortLabels={["Member", "Membership", "Payment"]}
+              shortLabels={["Info", "Plan", "Pay"]}
               currentStep={3}
             />
           ) : null}
           <p className="mt-1 text-sm text-zinc-600">All payments and receipts.</p>
         </div>
-        <Link
-          href="/members/new"
-          className="rounded-lg bg-[#1A1A2E] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
-        >
-          New Member
-        </Link>
+        {!flowNewMember ? (
+          <Link
+            href="/members/new"
+            className="rounded-lg bg-[#1A1A2E] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
+          >
+            New Member
+          </Link>
+        ) : null}
       </div>
 
       {membershipId ? (
@@ -152,11 +154,11 @@ export function PaymentsPageClient({
             }}
           />
         </div>
-      ) : (
+      ) : items.length === 0 ? (
         <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
           To add a payment: open a member → start a membership → then record payment here.
         </div>
-      )}
+      ) : null}
 
       <div className="card-surface mt-8 overflow-hidden rounded-xl border border-zinc-200">
         <div className="grid grid-cols-12 gap-2 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium text-zinc-600">
@@ -177,10 +179,10 @@ export function PaymentsPageClient({
               key={p.id}
               className="grid grid-cols-12 gap-2 px-4 py-3 text-sm text-zinc-900 hover:bg-zinc-50"
             >
-              <div className="col-span-3 font-medium">{formatDateShortIST(p.payment_date)}</div>
-              <div className="col-span-3 truncate text-zinc-800">
-                {p.members?.full_name ?? "—"}
-                <span className="mt-0.5 block truncate text-xs text-zinc-500">
+              <div className="col-span-3 font-medium whitespace-nowrap">{formatShortPaymentDate(p.payment_date)}</div>
+              <div className="col-span-3 text-zinc-800">
+                <div className="line-clamp-2 break-words font-medium">{p.members?.full_name ?? "—"}</div>
+                <span className="mt-0.5 block text-xs text-zinc-500">
                   {p.members?.member_code ?? ""}
                 </span>
               </div>
@@ -238,5 +240,20 @@ export function PaymentsPageClient({
       </div>
     </div>
   );
+}
+
+function formatShortPaymentDate(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return formatDateShortIST(value);
+  const now = new Date();
+  if (d.getUTCFullYear() === now.getUTCFullYear()) {
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", timeZone: "Asia/Kolkata" });
+  }
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
 }
 

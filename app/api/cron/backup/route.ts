@@ -171,9 +171,7 @@ export async function GET(request: NextRequest) {
     plan: string;
     expiry: string;
     daysLeft: string;
-    lastPaid: string;
-    amount: string;
-    mode: string;
+    statusLabel: string;
     status: RowStatus;
     sortEnd: string;
     sortDays: number;
@@ -217,12 +215,17 @@ export async function GET(request: NextRequest) {
     }
 
     const lp = latestPayment(mem.id);
-    const lastPaid = lp ? formatInTimeZone(new Date(lp.payment_date), IST_TZ, "dd MMM yyyy") : "—";
-    const amount = lp ? formatInr(Number(lp.amount ?? 0)) : "—";
-    const mode = lp ? String(lp.payment_mode).toUpperCase() : "—";
     const lastPaidSortTs = lp ? new Date(lp.payment_date).getTime() : 0;
     const daysLeftStr =
       !lm ? "—" : status === "expired" ? String(daysLeftNum) : String(daysLeftNum);
+    const statusLabel =
+      status === "expired"
+        ? "Expired"
+        : status === "expiring_soon"
+          ? "Expiring soon"
+          : status === "no_membership"
+            ? "No membership"
+            : "Active";
 
     rows.push({
       name: mem.full_name,
@@ -230,9 +233,7 @@ export async function GET(request: NextRequest) {
       plan,
       expiry: expiry === "—" ? "—" : formatInTimeZone(new Date(`${expiry}T00:00:00+05:30`), IST_TZ, "dd MMM yyyy"),
       daysLeft: daysLeftStr,
-      lastPaid,
-      amount,
-      mode,
+      statusLabel,
       status,
       sortEnd: lm ? String(lm.end_date) : "",
       sortDays: daysLeftNum,
@@ -252,13 +253,17 @@ export async function GET(request: NextRequest) {
   });
 
   const subjectDate = formatInTimeZone(new Date(), IST_TZ, "dd MMM yyyy");
-  const subject = `SM FITNESS — Member Backup ${subjectDate} (${active} active members)`;
+  const subject =
+    expired > 0
+      ? `SM FITNESS — Member Backup ${subjectDate} (${active} active, ⚠ ${expired} expired)`
+      : `SM FITNESS — Member Backup ${subjectDate} (${active} active members)`;
 
   const summaryBar = `
   <div style="background:#1e293b;color:#fff;padding:12px 16px;border-radius:8px;font-family:system-ui,sans-serif;font-size:14px;margin-bottom:16px;">
     <div><strong>Total:</strong> ${total} &nbsp;|&nbsp; <strong>Active:</strong> ${active} &nbsp;|&nbsp; <strong>Expiring this week:</strong> ${expiringSoon} &nbsp;|&nbsp; <strong>Expired:</strong> ${expired} &nbsp;|&nbsp; <strong>No plan:</strong> ${noMembership}</div>
     <div style="margin-top:8px;"><strong>This month revenue:</strong> ${formatInr(revenueThisMonth)} &nbsp;|&nbsp; <strong>Cash:</strong> ${formatInr(cashThisMonth)} &nbsp;|&nbsp; <strong>UPI:</strong> ${formatInr(upiThisMonth)}</div>
   </div>`;
+  const legendRow = `<p style="margin:0 0 12px 0;font-size:12px;color:#334155;">🔴 Expired&nbsp;&nbsp;🟡 Expiring soon&nbsp;&nbsp;🔵 No membership&nbsp;&nbsp;⚪ Active</p>`;
 
   const rowBg: Record<RowStatus, string> = {
     expired: "#FEE2E2",
@@ -269,15 +274,13 @@ export async function GET(request: NextRequest) {
 
   let tableBody = "";
   for (const r of rows) {
-    tableBody += `<tr style="background:${rowBg[r.status]};">
+    tableBody += `<tr style="background-color:${rowBg[r.status]};">
       <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.name)}</td>
       <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.mobile)}</td>
       <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.plan)}</td>
       <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.expiry)}</td>
       <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.daysLeft)}</td>
-      <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.lastPaid)}</td>
-      <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.amount)}</td>
-      <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.mode)}</td>
+      <td style="padding:8px;border:1px solid #e2e8f0;">${escapeHtml(r.statusLabel)}</td>
     </tr>`;
   }
 
@@ -286,6 +289,7 @@ export async function GET(request: NextRequest) {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/></head>
   <body style="font-family:system-ui,sans-serif;color:#0f172a;">
   ${summaryBar}
+  ${legendRow}
   <table style="border-collapse:collapse;width:100%;font-size:13px;">
     <thead>
       <tr style="background:#334155;color:#fff;">
@@ -294,9 +298,7 @@ export async function GET(request: NextRequest) {
         <th style="padding:8px;border:1px solid #334155;text-align:left;">Plan</th>
         <th style="padding:8px;border:1px solid #334155;text-align:left;">Expiry</th>
         <th style="padding:8px;border:1px solid #334155;text-align:left;">Days Left</th>
-        <th style="padding:8px;border:1px solid #334155;text-align:left;">Last Paid</th>
-        <th style="padding:8px;border:1px solid #334155;text-align:left;">Amount</th>
-        <th style="padding:8px;border:1px solid #334155;text-align:left;">Mode</th>
+        <th style="padding:8px;border:1px solid #334155;text-align:left;">Status</th>
       </tr>
     </thead>
     <tbody>${tableBody}</tbody>

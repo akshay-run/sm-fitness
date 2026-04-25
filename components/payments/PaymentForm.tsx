@@ -286,7 +286,7 @@ export function PaymentForm({
             ? "Saving..."
             : mode === "upi"
               ? "Confirm payment"
-              : "Confirm payment received"}
+              : "Record Payment"}
         </button>
       </form>
 

@@ -33,11 +33,11 @@ export default function NewMemberPage() {
         </h1>
         <FlowSteps
           steps={["Add member", "Start membership", "Record payment"]}
-          shortLabels={["Member", "Membership", "Payment"]}
+          shortLabels={["Info", "Plan", "Pay"]}
           currentStep={1}
         />
         <p className="mt-1 text-sm text-zinc-600">
-          Mobile and email are required. Other fields are optional.
+          Full name and mobile are required. Email is optional but recommended for receipts.
         </p>
       </div>
 

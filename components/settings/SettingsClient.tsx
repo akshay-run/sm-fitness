@@ -31,7 +31,7 @@ export function SettingsClient({
   initialSettings?: SettingsPayload;
 }) {
   const queryClient = useQueryClient();
-  const [saving, setSaving] = useState(false);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [gymName, setGymName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -65,25 +65,17 @@ export function SettingsClient({
     setQrUrl(data.upi_qr_signed_url);
   }, [data]);
 
-  async function saveText(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
+  async function savePatch(payload: Record<string, unknown>, successMessage: string, section: string) {
+    setSavingSection(section);
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          gym_name: gymName.trim(),
-          address: address.trim() || null,
-          phone: phone.trim() || null,
-          upi_id: upiId.trim() || null,
-          backup_email: backupEmail.trim() || null,
-          whatsapp_group_link: whatsappGroupLink.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error ?? "Could not save. Please check your connection.");
-      toast.success("Settings saved ✓");
+      toast.success(successMessage);
       setLogoUrl(json.logo_signed_url ?? null);
       setQrUrl(json.upi_qr_signed_url ?? null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "full"] });
@@ -92,7 +84,7 @@ export function SettingsClient({
         e instanceof Error ? e.message : "Could not save. Please check your connection."
       );
     } finally {
-      setSaving(false);
+      setSavingSection(null);
     }
   }
 
@@ -137,7 +129,7 @@ export function SettingsClient({
         Gym details, UPI, and branding used on receipts and payment screens.
       </p>
 
-      <form onSubmit={saveText} className="mt-6 space-y-0">
+      <div className="mt-6 space-y-0">
         <section className={cardClass} aria-labelledby="settings-gym-profile">
           <h2 id="settings-gym-profile" className={sectionTitleClass}>
             Gym Profile
@@ -178,6 +170,24 @@ export function SettingsClient({
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
+            <button
+              type="button"
+              onClick={() =>
+                void savePatch(
+                  {
+                    gym_name: gymName.trim(),
+                    address: address.trim() || null,
+                    phone: phone.trim() || null,
+                  },
+                  "Gym profile saved ✓",
+                  "gym"
+                )
+              }
+              disabled={savingSection !== null}
+              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+            >
+              {savingSection === "gym" ? "Saving…" : "Save Gym Profile"}
+            </button>
           </div>
         </section>
 
@@ -227,6 +237,20 @@ export function SettingsClient({
                 </label>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() =>
+                void savePatch(
+                  { upi_id: upiId.trim() || null },
+                  "Payment details saved ✓",
+                  "payment"
+                )
+              }
+              disabled={savingSection !== null}
+              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+            >
+              {savingSection === "payment" ? "Saving…" : "Save Payment Details"}
+            </button>
           </div>
         </section>
 
@@ -310,19 +334,26 @@ export function SettingsClient({
                 </button>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() =>
+                void savePatch(
+                  {
+                    backup_email: backupEmail.trim() || null,
+                    whatsapp_group_link: whatsappGroupLink.trim() || null,
+                  },
+                  "Notifications saved ✓",
+                  "notifications"
+                )
+              }
+              disabled={savingSection !== null}
+              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+            >
+              {savingSection === "notifications" ? "Saving…" : "Save Notifications"}
+            </button>
           </div>
         </section>
-
-        <div className="sticky bottom-4 z-10 pt-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-lg bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

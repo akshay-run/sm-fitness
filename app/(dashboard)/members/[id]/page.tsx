@@ -331,12 +331,32 @@ export default function MemberProfilePage({
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6">
+      <div className="mb-3">
+        <Link
+          href="/members"
+          className="inline-flex items-center gap-1 text-sm font-medium text-zinc-700 hover:text-zinc-900"
+        >
+          <span aria-hidden>←</span> Members
+        </Link>
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            {member.full_name}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600">{member.member_code}</p>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0">
+            {photoSignedUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoSignedUrl} alt={member.full_name} className="h-16 w-16 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                {getInitials(member.full_name)}
+              </div>
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              {member.full_name}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600">{member.member_code}</p>
+          </div>
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           <div className="flex flex-wrap justify-end gap-2">
@@ -372,7 +392,7 @@ export default function MemberProfilePage({
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
-                className="rounded border border-red-600 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                className="rounded px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
               >
                 Archive member
               </button>
@@ -649,7 +669,18 @@ function Card({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-5">
       <div className="text-xs font-medium text-zinc-600">{label}</div>
-      <div className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{value}</div>
+      <div className="mt-1 whitespace-pre-wrap break-all text-sm text-zinc-900">{value}</div>
     </div>
   );
+}
+
+function getInitials(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "M";
+  const first = parts[0]?.[0] ?? "";
+  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  return `${first}${second}`.toUpperCase();
 }

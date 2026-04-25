@@ -22,6 +22,27 @@ export function LoginClient() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [gymName, setGymName] = useState("SM FITNESS");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings", { cache: "no-store" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || cancelled) return;
+        if (json?.gym_name) setGymName(String(json.gym_name));
+        if (json?.logo_signed_url) setLogoUrl(String(json.logo_signed_url));
+      } catch {
+        // Keep safe defaults on settings fetch failure.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,9 +119,17 @@ export function LoginClient() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col items-center text-center">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={`${gymName} logo`} className="mb-3 h-14 w-14 rounded-full object-cover" />
+          ) : (
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100 text-2xl">
+              🏋️
+            </div>
+          )}
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            SM FITNESS Admin
+            {gymName} Admin
           </h1>
           <p className="mt-1 text-sm text-zinc-600">Sign in to manage your gym.</p>
         </div>
@@ -129,16 +158,26 @@ export function LoginClient() {
             >
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-400"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={submitting}
-              required
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-16 text-sm text-zinc-900 outline-none focus:border-zinc-400"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={submitting}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-100"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           {error ? (

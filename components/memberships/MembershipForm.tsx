@@ -220,7 +220,7 @@ export function MembershipForm({
       ) : null}
 
       {selected ? (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-700">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700">
           Dates are auto-calculated based on existing active membership (if any).
         </div>
       ) : null}

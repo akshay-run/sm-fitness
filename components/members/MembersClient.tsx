@@ -281,7 +281,7 @@ export function MembersClient(props: {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap">
           {TAB_LABELS.map(({ id, short }) => {
             const count =
               id === "all"
@@ -302,7 +302,7 @@ export function MembersClient(props: {
                   setPage(1);
                 }}
                 className={[
-                  "rounded-full px-3 py-1.5 text-sm transition-colors",
+                  "whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition-colors",
                   active
                     ? "bg-zinc-900 text-white"
                     : "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
@@ -342,8 +342,8 @@ export function MembersClient(props: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.photo_signed_url} alt={m.full_name} className="h-12 w-12 rounded-full object-cover" />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-slate-600">
-                      👤
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                      {getInitials(m.full_name)}
                     </div>
                   )}
                   <div className="min-w-0">
@@ -352,8 +352,9 @@ export function MembersClient(props: {
                       {m.member_code} · {m.mobile}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {m.membership_plan_name ?? "No plan"} ·{" "}
-                      {m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "No expiry"}
+                      {m.membership_plan_name
+                        ? `${m.membership_plan_name} · ${m.membership_end_date ? formatDateShortIST(m.membership_end_date) : "No expiry"}`
+                        : "No membership"}
                     </div>
                   </div>
                 </div>
@@ -417,7 +418,7 @@ export function MembersClient(props: {
                       <button
                         type="button"
                         onClick={() => setArchiveTarget(m)}
-                        className="rounded-lg border border-red-600 bg-white px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                        className="inline-flex min-h-[36px] items-center justify-center rounded-md px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
                       >
                         Archive
                       </button>
@@ -505,6 +506,17 @@ export function MembersClient(props: {
       />
     </div>
   );
+}
+
+function getInitials(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "M";
+  const first = parts[0]?.[0] ?? "";
+  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  return `${first}${second}`.toUpperCase();
 }
 
 function StatusBadge({

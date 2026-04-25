@@ -31,7 +31,7 @@ export function RevenueMiniChart({
               fontSize: 11,
             }}
           />
-          <Bar dataKey="total" fill="#18181b" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="total" fill="#2563eb" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
