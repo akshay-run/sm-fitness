@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { internalServerError } from "@/lib/apiError";
+import { addDaysIST, todayISTDateString } from "@/lib/dateUtils";
 
 function csvEscape(v: unknown) {
   const s = String(v ?? "");
@@ -10,32 +11,14 @@ function csvEscape(v: unknown) {
   return s;
 }
 
-function getStatusByEndDate(endDate: string | null, today: string) {
+function getStatusByEndDate(endDate: string | null, today: string, todayPlus7: string) {
   if (!endDate) return "no_membership";
   if (endDate < today) return "expired";
-  if (endDate <= todayPlus7(today)) return "expiring_soon";
+  if (endDate <= todayPlus7) return "expiring_soon";
   return "active";
 }
 
-function todayPlus7(today: string) {
-  const d = new Date(`${today}T00:00:00+05:30`);
-  d.setDate(d.getDate() + 7);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-}
-
-function todayIST() {
-  const now = new Date();
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return fmt.format(now);
-}
+type MembershipRow = { member_id: string; plan_id: string; end_date: string; status: string };
 
 export async function GET() {
   const { user } = await requireUser();
@@ -44,39 +27,49 @@ export async function GET() {
   }
 
   const supabaseAdmin = createSupabaseAdminClient();
-  const { data: members, error: memError } = await supabaseAdmin
-    .from("members")
-    .select("id, full_name, mobile, email, is_active")
-    .order("created_at", { ascending: false });
+
+  // Batch-fetch all data in parallel (eliminates N+1)
+  const [{ data: members, error: memError }, { data: membershipsRaw }, { data: plansRaw }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("members")
+        .select("id, full_name, mobile, email, is_active")
+        .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("memberships")
+        .select("member_id, plan_id, end_date, status")
+        .neq("status", "cancelled")
+        .order("end_date", { ascending: false }),
+      supabaseAdmin.from("plans").select("id, name"),
+    ]);
+
   if (memError) return internalServerError("Failed to generate members CSV");
+
+  // Build lookup maps
+  const planMap = new Map((plansRaw ?? []).map((p) => [String(p.id), String(p.name ?? "")]));
+
+  const latestMembershipByMember = new Map<string, MembershipRow>();
+  for (const ms of (membershipsRaw ?? []) as MembershipRow[]) {
+    const mid = String(ms.member_id);
+    if (!latestMembershipByMember.has(mid)) {
+      latestMembershipByMember.set(mid, ms);
+    }
+  }
+
+  const today = todayISTDateString();
+  const plus7 = addDaysIST(today, 7);
 
   const rows: string[] = [];
   rows.push(["name", "mobile", "email", "plan", "expiry", "status"].join(","));
 
-  const today = todayIST();
   for (const m of members ?? []) {
-    const { data: latest } = await supabaseAdmin
-      .from("memberships")
-      .select("plan_id, end_date")
-      .eq("member_id", m.id)
-      .neq("status", "cancelled")
-      .order("end_date", { ascending: false })
-      .limit(1);
-
-    const latestMembership = latest?.[0];
-    let planName = "";
-    if (latestMembership?.plan_id) {
-      const { data: plan } = await supabaseAdmin
-        .from("plans")
-        .select("name")
-        .eq("id", latestMembership.plan_id)
-        .single();
-      planName = plan?.name ?? "";
-    }
-
+    const latestMembership = latestMembershipByMember.get(String(m.id));
+    const planName = latestMembership?.plan_id
+      ? planMap.get(String(latestMembership.plan_id)) ?? ""
+      : "";
     const expiry = latestMembership?.end_date ? String(latestMembership.end_date) : "";
     const status = m.is_active
-      ? getStatusByEndDate(expiry || null, today)
+      ? getStatusByEndDate(expiry || null, today, plus7)
       : "inactive";
 
     rows.push(

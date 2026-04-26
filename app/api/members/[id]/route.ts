@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { updateMemberSchema } from "@/lib/validations/member.schema";
 import { ageFromDateOfBirth } from "@/lib/memberAge";
+import { getDaysRemaining, getMembershipStatusFromEndDate, todayISTDateString } from "@/lib/dateUtils";
+import { internalServerError } from "@/lib/apiError";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -25,91 +27,70 @@ export async function GET(
   const supabaseAdmin = createSupabaseAdminClient();
   const photoBucket =
     process.env.SUPABASE_MEMBER_PHOTO_BUCKET || "sm-fitness-member-photo";
+  const memberId = parsedParams.data.id;
+  const todayIST = todayISTDateString();
+
+  // Fetch member first (needed for photo URL check)
   const { data, error: dbError } = await supabaseAdmin
     .from("members")
-    .select("*")
-    .eq("id", parsedParams.data.id)
+    .select(
+      "id, member_code, full_name, mobile, email, photo_url, is_active, date_of_birth, gender, address, blood_group, joining_date, notes, created_at, welcome_wa_sent"
+    )
+    .eq("id", memberId)
     .single();
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 404 });
-
-  let photoSignedUrl: string | null = null;
-  if (data?.photo_url) {
-    const { data: signed } = await supabaseAdmin.storage
-      .from(photoBucket)
-      .createSignedUrl(String(data.photo_url), 60 * 60);
-    photoSignedUrl = signed?.signedUrl ?? null;
+  if (dbError) {
+    console.error("[GET /api/members/:id] member fetch", dbError);
+    return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
 
-  const todayIST = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  // Parallelize all independent queries
+  const [
+    photoResult,
+    { data: allMemberships },
+    { data: activeMembershipsForPreview },
+    { data: recentPayments },
+  ] = await Promise.all([
+    data?.photo_url
+      ? supabaseAdmin.storage
+          .from(photoBucket)
+          .createSignedUrl(String(data.photo_url), 60 * 60)
+      : Promise.resolve({ data: null }),
+    supabaseAdmin
+      .from("memberships")
+      .select("id, plan_id, fee_charged, start_date, end_date, status")
+      .eq("member_id", memberId)
+      .order("end_date", { ascending: false }),
+    supabaseAdmin
+      .from("memberships")
+      .select("end_date")
+      .eq("member_id", memberId)
+      .neq("status", "cancelled")
+      .gte("end_date", todayIST)
+      .order("end_date", { ascending: false })
+      .limit(1),
+    supabaseAdmin
+      .from("payments")
+      .select("id, receipt_number, amount, payment_date, payment_mode")
+      .eq("member_id", memberId)
+      .order("payment_date", { ascending: false })
+      .limit(3),
+  ]);
 
-  const { data: latestMembership } = await supabaseAdmin
-    .from("memberships")
-    .select("id, plan_id, fee_charged, start_date, end_date, status")
-    .eq("member_id", parsedParams.data.id)
-    .neq("status", "cancelled")
-    .order("end_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: activeMembershipsForPreview } = await supabaseAdmin
-    .from("memberships")
-    .select("end_date")
-    .eq("member_id", parsedParams.data.id)
-    .neq("status", "cancelled")
-    .gte("end_date", todayIST)
-    .order("end_date", { ascending: false })
-    .limit(1);
+  const photoSignedUrl = photoResult?.data?.signedUrl ?? null;
 
   const latest_active_end_date =
     activeMembershipsForPreview?.[0]?.end_date != null
       ? String(activeMembershipsForPreview[0].end_date)
       : null;
 
-  const { data: plan } = latestMembership?.plan_id
-    ? await supabaseAdmin
-        .from("plans")
-        .select("name")
-        .eq("id", latestMembership.plan_id)
-        .single()
-    : { data: null };
+  // Derive latest non-cancelled membership
+  const nonCancelled = (allMemberships ?? []).filter(
+    (m) => String(m.status) !== "cancelled"
+  );
+  const latestMembership = nonCancelled[0] ?? null; // already sorted desc by end_date
 
-  let membershipStatus: "active" | "expiring" | "expired" | "none" = "none";
-  let daysLeft = 0;
-  if (latestMembership?.end_date) {
-    const end = String(latestMembership.end_date);
-    if (end < todayIST) {
-      membershipStatus = "expired";
-      daysLeft = 0;
-    } else {
-      const diffDays = Math.ceil(
-        (new Date(`${end}T00:00:00+05:30`).getTime() -
-          new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
-          (1000 * 60 * 60 * 24)
-      );
-      daysLeft = diffDays;
-      membershipStatus = diffDays <= 7 ? "expiring" : "active";
-    }
-  }
-
-  const { data: recentPayments } = await supabaseAdmin
-    .from("payments")
-    .select("id, receipt_number, amount, payment_date, payment_mode")
-    .eq("member_id", parsedParams.data.id)
-    .order("payment_date", { ascending: false })
-    .limit(3);
-
-  const { data: allMemberships } = await supabaseAdmin
-    .from("memberships")
-    .select("id, plan_id, fee_charged, start_date, end_date, status")
-    .eq("member_id", parsedParams.data.id)
-    .order("end_date", { ascending: false });
-
+  // Batch-fetch plan names for membership history
   const histPlanIds = Array.from(
     new Set((allMemberships ?? []).map((m) => String(m.plan_id)))
   );
@@ -117,6 +98,19 @@ export async function GET(
     ? await supabaseAdmin.from("plans").select("id, name").in("id", histPlanIds)
     : { data: [] as { id: string; name: string }[] };
   const histPlanMap = new Map((histPlans ?? []).map((p) => [String(p.id), p.name]));
+
+  // Use centralised dateUtils for status calculation
+  const endDateStr = latestMembership?.end_date
+    ? String(latestMembership.end_date)
+    : null;
+  const statusFromUtils = getMembershipStatusFromEndDate(endDateStr);
+  const daysLeft = endDateStr ? Math.max(0, getDaysRemaining(endDateStr)) : 0;
+  const membershipStatus: "active" | "expiring" | "expired" | "none" =
+    statusFromUtils === "no-plan"
+      ? "none"
+      : statusFromUtils === "expiring"
+        ? "expiring"
+        : statusFromUtils;
 
   const membershipHistory = (allMemberships ?? []).map((row) => ({
     id: row.id,
@@ -137,7 +131,7 @@ export async function GET(
     membershipHistory,
     membershipSummary: latestMembership
       ? {
-          plan_name: plan?.name ?? "Membership",
+          plan_name: histPlanMap.get(String(latestMembership.plan_id)) ?? "Membership",
           fee_charged: Number(latestMembership.fee_charged ?? 0),
           start_date: latestMembership.start_date,
           end_date: latestMembership.end_date,
@@ -201,7 +195,10 @@ export async function PATCH(
     .select("id")
     .single();
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) {
+    console.error("[PATCH /api/members/:id]", dbError);
+    return internalServerError("Failed to update member");
+  }
   return NextResponse.json({ id: data.id });
 }
 
@@ -226,7 +223,10 @@ export async function DELETE(
     .select("id")
     .single();
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) {
+    console.error("[DELETE /api/members/:id]", dbError);
+    return internalServerError("Failed to archive member");
+  }
   return NextResponse.json({ id: data.id });
 }
 

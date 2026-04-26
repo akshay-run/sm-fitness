@@ -28,18 +28,46 @@ async function handleType({
     .eq("end_date", targetEndDate);
 
   if (error) throw new Error(error.message);
+  if (!memberships?.length) return { attempted: 0, sent: 0, skipped: 0, failed: 0 };
+
+  // --- Batch fetch members, plans, and newer memberships (eliminates N+1) ---
+  const memberIds = [...new Set(memberships.map((m) => String(m.member_id)))];
+  const planIds = [...new Set(memberships.map((m) => String(m.plan_id)))];
+
+  const [{ data: membersRaw }, { data: plansRaw }] = await Promise.all([
+    supabaseAdmin
+      .from("members")
+      .select("id, full_name, email, is_active")
+      .in("id", memberIds),
+    supabaseAdmin.from("plans").select("id, name").in("id", planIds),
+  ]);
+
+  const memberMap = new Map(
+    (membersRaw ?? []).map((m) => [String(m.id), m])
+  );
+  const planMap = new Map(
+    (plansRaw ?? []).map((p) => [String(p.id), p.name as string])
+  );
+
+  // For expired/reminder_1d, batch check for newer memberships
+  let membersWithNewerMembership: Set<string> | null = null;
+  if (type === "expired" || type === "reminder_1d") {
+    const { data: newerRows } = await supabaseAdmin
+      .from("memberships")
+      .select("member_id")
+      .in("member_id", memberIds)
+      .gte("start_date", todayIST);
+    membersWithNewerMembership = new Set(
+      (newerRows ?? []).map((r) => String(r.member_id))
+    );
+  }
 
   const stats: JobStat = { attempted: 0, sent: 0, skipped: 0, failed: 0 };
 
-  for (const m of memberships ?? []) {
+  for (const m of memberships) {
     stats.attempted += 1;
 
-    const { data: member } = await supabaseAdmin
-      .from("members")
-      .select("id, full_name, email, is_active")
-      .eq("id", m.member_id)
-      .single();
-
+    const member = memberMap.get(String(m.member_id));
     if (!member) {
       stats.skipped += 1;
       continue;
@@ -71,31 +99,18 @@ async function handleType({
       continue;
     }
 
-    if (type === "expired" || type === "reminder_1d") {
-      const { data: newMembership } = await supabaseAdmin
-        .from("memberships")
-        .select("id, start_date")
-        .eq("member_id", member.id)
-        .gte("start_date", todayIST)
-        .limit(1);
-
-      if (newMembership && newMembership.length > 0) {
-        stats.skipped += 1;
-        continue;
-      }
+    if (membersWithNewerMembership?.has(String(member.id))) {
+      stats.skipped += 1;
+      continue;
     }
 
-    const { data: plan } = await supabaseAdmin
-      .from("plans")
-      .select("name")
-      .eq("id", m.plan_id)
-      .single();
+    const planName = planMap.get(String(m.plan_id)) ?? "Membership";
 
     const html = renderReminderEmail({
       gymName,
       memberName: member.full_name,
       type,
-      planName: plan?.name ?? "Membership",
+      planName,
       endDate: formatDateShortIST(String(m.end_date)),
     });
 

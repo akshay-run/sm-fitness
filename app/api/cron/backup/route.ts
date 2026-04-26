@@ -4,7 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { sendMail } from "@/lib/mailer";
 import { logBackupEmail } from "@/lib/email";
 import { skipBackupEmailIfNoRecipient } from "@/lib/memberEmail";
-import { IST_TZ, monthBoundsIST, todayISTDateString } from "@/lib/dateUtils";
+import { IST_TZ, getDaysRemaining, monthBoundsIST, todayISTDateString } from "@/lib/dateUtils";
 
 type MemberRow = {
   id: string;
@@ -40,14 +40,6 @@ function escapeHtml(s: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function daysLeftFromEnd(todayIST: string, endDate: string): number {
-  return Math.ceil(
-    (new Date(`${endDate}T00:00:00+05:30`).getTime() -
-      new Date(`${todayIST}T00:00:00+05:30`).getTime()) /
-      (1000 * 60 * 60 * 24)
-  );
 }
 
 function tier(s: RowStatus): number {
@@ -200,10 +192,10 @@ export async function GET(request: NextRequest) {
       const end = String(lm.end_date);
       if (end < todayIST) {
         status = "expired";
-        daysLeftNum = daysLeftFromEnd(todayIST, end);
+        daysLeftNum = getDaysRemaining(end);
         expired += 1;
       } else {
-        daysLeftNum = daysLeftFromEnd(todayIST, end);
+        daysLeftNum = getDaysRemaining(end);
         if (daysLeftNum <= 7) {
           status = "expiring_soon";
           expiringSoon += 1;

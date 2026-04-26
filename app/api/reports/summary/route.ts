@@ -91,7 +91,10 @@ export async function GET(req: Request) {
   }
 
   const { data: payments, error: payErr } = await payQuery;
-  if (payErr) return NextResponse.json({ error: payErr.message }, { status: 500 });
+  if (payErr) {
+    console.error("[GET /api/reports/summary]", payErr);
+    return NextResponse.json({ error: "Failed to load report data" }, { status: 500 });
+  }
 
   const payRows = (payments ?? []) as PaymentNestedRow[];
 

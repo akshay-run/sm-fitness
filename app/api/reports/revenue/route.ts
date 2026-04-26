@@ -18,7 +18,10 @@ export async function GET() {
     .select("payment_date, amount, payment_mode")
     .order("payment_date", { ascending: false });
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) {
+    console.error("[GET /api/reports/revenue]", dbError);
+    return NextResponse.json({ error: "Failed to load revenue data" }, { status: 500 });
+  }
 
   const map = new Map<
     string,

@@ -86,7 +86,10 @@ export async function PATCH(req: Request) {
     .from("gym_settings")
     .upsert({ id: 1, ...updates }, { onConflict: "id" });
 
-  if (upError) return internalServerError(upError.message);
+  if (upError) {
+    console.error("[PATCH /api/settings]", upError);
+    return internalServerError("Failed to save settings");
+  }
 
   const display = await getGymDisplay(supabaseAdmin);
   return NextResponse.json(display);

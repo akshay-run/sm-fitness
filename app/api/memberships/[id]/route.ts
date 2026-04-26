@@ -25,7 +25,10 @@ export async function GET(
     .eq("id", parsedParams.data.id)
     .single();
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 404 });
+  if (dbError) {
+    console.error("[GET /api/memberships/:id]", dbError);
+    return NextResponse.json({ error: "Membership not found" }, { status: 404 });
+  }
   return NextResponse.json({ membership: data });
 }
 

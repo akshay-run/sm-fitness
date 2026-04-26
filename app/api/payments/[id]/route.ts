@@ -88,7 +88,10 @@ export async function GET(
     .eq("id", parsedParams.data.id)
     .single();
 
-  if (dbError || !row) return NextResponse.json({ error: dbError?.message ?? "Not found" }, { status: 404 });
+  if (dbError || !row) {
+    console.error("[GET /api/payments/:id]", dbError);
+    return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+  }
 
   const r = row as PaymentJoinRow;
   const member = Array.isArray(r.members) ? r.members[0] ?? null : r.members ?? null;

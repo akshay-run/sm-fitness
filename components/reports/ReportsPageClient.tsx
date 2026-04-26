@@ -11,8 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
 import type { CellHookData } from "jspdf-autotable";
 import {
   formatAmountINR,
@@ -165,7 +164,12 @@ export function ReportsPageClient({
 
   const exportPdf = useCallback(async () => {
     if (!data) return;
-    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    // Dynamic imports — only load jsPDF when user clicks "Export PDF"
+    const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const doc = new JsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const margin = PDF_MARGIN;
     const notoOk = await embedNotoSans(doc);
     const tableFont = notoOk ? "NotoSans" : "helvetica";
