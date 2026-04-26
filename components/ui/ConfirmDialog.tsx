@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type ConfirmTone = "default" | "danger" | "success";
 
@@ -30,15 +30,39 @@ export function ConfirmDialog({
 }) {
   const titleId = "confirm-dialog-title";
   const descriptionId = "confirm-dialog-description";
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const tone: ConfirmTone = confirmTone ?? (danger ? "danger" : "default");
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onCancel();
+      if (e.key === "Tab" && dialogRef.current) {
+        const nodes = dialogRef.current.querySelectorAll<HTMLElement>(
+          "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        );
+        const focusables = Array.from(nodes).filter((n) => !n.hasAttribute("disabled"));
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement as HTMLElement | null;
+        if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        } else if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      }
     }
-    if (open) window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    if (open) {
+      window.addEventListener("keydown", onKeyDown);
+      cancelBtnRef.current?.focus();
+    }
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, onCancel]);
 
   if (!open) return null;
@@ -58,7 +82,7 @@ export function ConfirmDialog({
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
     >
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+      <div ref={dialogRef} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
         <h2 id={titleId} className="text-base font-semibold text-zinc-900">
           {title}
         </h2>
@@ -69,6 +93,7 @@ export function ConfirmDialog({
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button
+            ref={cancelBtnRef}
             type="button"
             onClick={onCancel}
             className="rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 hover:bg-zinc-50"

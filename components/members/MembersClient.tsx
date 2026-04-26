@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatDateShortIST } from "@/lib/uiFormat";
 import {
@@ -19,6 +20,7 @@ import {
   whatsappLink,
 } from "@/lib/messageTemplates";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AvatarFallback } from "@/components/ui/AvatarFallback";
 
 export type MemberWithSignedPhoto = MemberWithMemberships & {
   photo_signed_url: string | null;
@@ -78,8 +80,10 @@ export function MembersClient(props: {
   initialExpiringWithinDays: number | null;
   gymName: string;
 }) {
+  const router = useRouter();
   const [members, setMembers] = useState<MemberWithSignedPhoto[]>(props.initialMembers);
   const [activeTab, setActiveTab] = useState<MemberTabId>(props.initialTab);
+  const [searchInput, setSearchInput] = useState<string>(props.initialQuery);
   const [searchQuery, setSearchQuery] = useState<string>(props.initialQuery);
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(25);
@@ -89,6 +93,13 @@ export function MembersClient(props: {
 
   const [restoreTarget, setRestoreTarget] = useState<MemberWithSignedPhoto | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<MemberWithSignedPhoto | null>(null);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
   const computed = useMemo(() => {
     const now = new Date();
@@ -271,9 +282,9 @@ export function MembersClient(props: {
           </svg>
           <input
             id="members-search"
-            value={searchQuery}
+            value={searchInput}
             onChange={(e) => {
-              setSearchQuery(e.target.value);
+              setSearchInput(e.target.value);
               setPage(1);
             }}
             placeholder="e.g. Rahul or 98765..."
@@ -335,17 +346,22 @@ export function MembersClient(props: {
           </div>
         ) : (
           visibleMembers.map((m) => (
-            <div key={m.id} className="card-surface rounded-xl border border-zinc-200 p-5">
+            <div
+              key={m.id}
+              className="card-surface cursor-pointer rounded-xl border border-zinc-200 p-5"
+              role="link"
+              tabIndex={0}
+              onClick={() => router.push(`/members/${m.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/members/${m.id}`);
+                }
+              }}
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  {m.photo_signed_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.photo_signed_url} alt={m.full_name} className="h-12 w-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                      {getInitials(m.full_name)}
-                    </div>
-                  )}
+                  <AvatarFallback name={m.full_name} photoUrl={m.photo_signed_url} size="md" />
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-[#1A1A2E]">{m.full_name}</div>
                     <div className="text-sm text-slate-500">
@@ -366,7 +382,10 @@ export function MembersClient(props: {
                   {activeTab === "deactivated" ? (
                     <button
                       type="button"
-                      onClick={() => setRestoreTarget(m)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRestoreTarget(m);
+                      }}
                       className="rounded-lg border border-green-600 bg-white px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-50"
                     >
                       Restore member
@@ -386,7 +405,8 @@ export function MembersClient(props: {
                                 gymName: props.gymName,
                               })
                             )}
-                            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
+                            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 hover:bg-green-100"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             WhatsApp
                           </a>
@@ -401,7 +421,8 @@ export function MembersClient(props: {
                                 gymName: props.gymName,
                               })
                             )}
-                            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 hover:bg-zinc-50"
+                            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 hover:bg-gray-100"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             SMS
                           </a>
@@ -411,14 +432,18 @@ export function MembersClient(props: {
                         <Link
                           href={`/memberships/new?memberId=${m.id}`}
                           className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-xs hover:bg-zinc-50"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Renew
                         </Link>
                       ) : null}
                       <button
                         type="button"
-                        onClick={() => setArchiveTarget(m)}
-                        className="inline-flex min-h-[36px] items-center justify-center rounded-md px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArchiveTarget(m);
+                        }}
+                        className="inline-flex min-h-[36px] items-center justify-center px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
                       >
                         Archive
                       </button>
@@ -428,6 +453,7 @@ export function MembersClient(props: {
                 <Link
                   href={`/members/${m.id}`}
                   className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium text-[#1A1A2E] underline underline-offset-4"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   Open →
                 </Link>
@@ -506,17 +532,6 @@ export function MembersClient(props: {
       />
     </div>
   );
-}
-
-function getInitials(name: string): string {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "M";
-  const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
-  return `${first}${second}`.toUpperCase();
 }
 
 function StatusBadge({

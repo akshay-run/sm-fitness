@@ -97,3 +97,20 @@ export function reportScopeBounds(scope: ReportScope): {
   return { startIST: null, endIST: null };
 }
 
+export function getDaysRemaining(endDate: string): number {
+  const today = todayISTDateString();
+  const endMs = new Date(`${endDate}T00:00:00+05:30`).getTime();
+  const todayMs = new Date(`${today}T00:00:00+05:30`).getTime();
+  return Math.ceil((endMs - todayMs) / (1000 * 60 * 60 * 24));
+}
+
+export function getMembershipStatusFromEndDate(
+  endDate: string | null
+): "active" | "expiring" | "expired" | "no-plan" {
+  if (!endDate) return "no-plan";
+  const daysRemaining = getDaysRemaining(endDate);
+  if (daysRemaining < 0) return "expired";
+  if (daysRemaining <= 7) return "expiring";
+  return "active";
+}
+

@@ -5,6 +5,7 @@ import { addDaysIST, todayISTDateString } from "@/lib/dateUtils";
 import { hasSentEmailOnDate, sendAndLog } from "@/lib/email";
 import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderReminderEmail } from "@/components/email/ReminderEmail";
+import { formatDateShortIST } from "@/lib/uiFormat";
 
 type JobStat = { attempted: number; sent: number; skipped: number; failed: number };
 
@@ -79,11 +80,6 @@ async function handleType({
         .limit(1);
 
       if (newMembership && newMembership.length > 0) {
-        if (type === "expired") {
-          console.log(`Skipping expired email for ${member.full_name} — renewed today`);
-        } else {
-          console.log(`Skipping 1-day reminder for ${member.full_name} — renewed today`);
-        }
         stats.skipped += 1;
         continue;
       }
@@ -100,15 +96,16 @@ async function handleType({
       memberName: member.full_name,
       type,
       planName: plan?.name ?? "Membership",
-      endDate: String(m.end_date),
+      endDate: formatDateShortIST(String(m.end_date)),
     });
 
+    const firstName = String(member.full_name || "").trim().split(/\s+/)[0] || member.full_name;
     const subject =
       type === "expired"
-        ? `Your ${gymName} membership has expired — Renew now`
+        ? `Your membership has expired — come back to ${gymName}!`
         : type === "reminder_1d"
-          ? `⚠️ Your membership expires in 1 day — ${gymName}`
-          : `⚠️ Your membership expires in 7 days — ${gymName}`;
+          ? `🚨 Last day! ${firstName}, your membership expires tomorrow — ${gymName}`
+          : `⏰ ${firstName}, your membership expires in 7 days — ${gymName}`;
 
     const sent = await sendAndLog({
       supabaseAdmin,

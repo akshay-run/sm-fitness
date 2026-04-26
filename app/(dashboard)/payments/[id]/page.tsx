@@ -130,6 +130,7 @@ export default function PaymentDetailPage({
         endDate: formatDateShortIST(membership.end_date),
         amount: Number(payment.amount),
         mode: payment.payment_mode.toUpperCase(),
+        gymName: gym?.gym_name ?? "SM FITNESS",
       })
     : "";
 
@@ -143,6 +144,7 @@ export default function PaymentDetailPage({
           startDate: formatDateShortIST(membership.start_date),
           endDate: formatDateShortIST(membership.end_date),
           whatsappGroupLink: gym?.whatsapp_group_link ?? null,
+          gymName: gym?.gym_name ?? "SM FITNESS",
         })
       : "";
 
@@ -231,7 +233,7 @@ export default function PaymentDetailPage({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={gym.logo_signed_url}
-              alt=""
+              alt={`${gym?.gym_name ?? "Gym"} logo`}
               className="max-h-16 w-auto object-contain"
             />
           </div>

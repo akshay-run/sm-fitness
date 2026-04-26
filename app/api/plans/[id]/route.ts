@@ -48,8 +48,8 @@ export async function PATCH(
     .select("id, name, duration_months, default_price, is_active")
     .single();
 
-  if (dbError) return internalServerError(dbError.message);
-  return NextResponse.json({ plan: data });
+  if (dbError) return internalServerError("Failed to update plan");
+  return NextResponse.json({ data: { plan: data }, plan: data });
 }
 
 export async function DELETE(
@@ -72,7 +72,7 @@ export async function DELETE(
     .select("id", { count: "exact", head: true })
     .eq("plan_id", parsedParams.data.id);
 
-  if (usageError) return internalServerError(usageError.message);
+  if (usageError) return internalServerError("Failed to validate plan usage");
   if ((usageCount ?? 0) > 0) {
     return NextResponse.json(
       { error: "Cannot delete this plan because it is used in membership records." },
@@ -85,6 +85,6 @@ export async function DELETE(
     .delete()
     .eq("id", parsedParams.data.id);
 
-  if (dbError) return internalServerError(dbError.message);
-  return NextResponse.json({ ok: true });
+  if (dbError) return internalServerError("Failed to delete plan");
+  return NextResponse.json({ data: { ok: true }, ok: true });
 }

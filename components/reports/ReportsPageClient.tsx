@@ -315,6 +315,14 @@ export function ReportsPageClient({
             Revenue, payments, plan mix, and member growth for the selected period.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => void exportPdf()}
+          disabled={!data || loading}
+          className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
+        >
+          Export PDF
+        </button>
       </div>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="space-y-1">
@@ -335,14 +343,6 @@ export function ReportsPageClient({
         ) : (
           <p className="text-xs text-zinc-500">All recorded data</p>
         )}
-        <button
-          type="button"
-          onClick={() => void exportPdf()}
-          disabled={!data || loading}
-          className="sm:ml-auto rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-50"
-        >
-          Export PDF
-        </button>
       </div>
       {!data && loading ? (
         <div className="mt-8 text-sm text-zinc-600">Loading…</div>
@@ -364,7 +364,8 @@ export function ReportsPageClient({
             {data.payments.length === 0 ? (
               <EmptyState title="No data" message="No payment data for this period." />
             ) : (
-              <div className="mt-4 overflow-x-auto">
+              <div className="relative mt-4 overflow-x-auto">
+                <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-white to-transparent" />
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-zinc-200 text-xs font-medium text-zinc-500">

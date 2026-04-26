@@ -14,11 +14,19 @@ const createSchema = z.object({
   default_price: z.coerce.number().nonnegative().nullable().optional(),
 });
 
+const querySchema = z.object({
+  scope: z.enum(["manage"]).optional(),
+});
+
 export async function GET(req: Request) {
   const { user, error } = await requireUser();
   if (!user) return NextResponse.json({ error }, { status: 401 });
 
-  const scope = new URL(req.url).searchParams.get("scope");
+  const parsedQuery = querySchema.safeParse({
+    scope: new URL(req.url).searchParams.get("scope") ?? undefined,
+  });
+  if (!parsedQuery.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+  const scope = parsedQuery.data.scope;
   const manage = scope === "manage";
 
   const supabaseAdmin = createSupabaseAdminClient();
@@ -34,8 +42,9 @@ export async function GET(req: Request) {
 
   const { data, error: dbError } = await q;
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
-  return NextResponse.json({ plans: data ?? [] });
+  if (dbError) return internalServerError("Failed to load plans");
+  const plans = data ?? [];
+  return NextResponse.json({ data: { plans }, plans });
 }
 
 export async function POST(req: Request) {
@@ -63,7 +72,7 @@ export async function POST(req: Request) {
     .select("id, name, duration_months, default_price, is_active")
     .single();
 
-  if (dbError) return internalServerError(dbError.message);
-  return NextResponse.json({ plan: data }, { status: 201 });
+  if (dbError) return internalServerError("Failed to create plan");
+  return NextResponse.json({ data: { plan: data }, plan: data }, { status: 201 });
 }
 

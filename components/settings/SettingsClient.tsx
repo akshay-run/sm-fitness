@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { SectionSaveButton } from "@/components/ui/SectionSaveButton";
 
 type SettingsPayload = {
   gym_name: string;
@@ -31,7 +32,6 @@ export function SettingsClient({
   initialSettings?: SettingsPayload;
 }) {
   const queryClient = useQueryClient();
-  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [gymName, setGymName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -55,6 +55,8 @@ export function SettingsClient({
 
   useEffect(() => {
     if (!data) return;
+    // These are controlled form defaults hydrated from fetched settings.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGymName(data.gym_name || "");
     setAddress(data.address ?? "");
     setPhone(data.phone ?? "");
@@ -65,27 +67,17 @@ export function SettingsClient({
     setQrUrl(data.upi_qr_signed_url);
   }, [data]);
 
-  async function savePatch(payload: Record<string, unknown>, successMessage: string, section: string) {
-    setSavingSection(section);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error ?? "Could not save. Please check your connection.");
-      toast.success(successMessage);
-      setLogoUrl(json.logo_signed_url ?? null);
-      setQrUrl(json.upi_qr_signed_url ?? null);
-      await queryClient.invalidateQueries({ queryKey: ["settings", "full"] });
-    } catch (e: unknown) {
-      toast.error(
-        e instanceof Error ? e.message : "Could not save. Please check your connection."
-      );
-    } finally {
-      setSavingSection(null);
-    }
+  async function savePatch(payload: Record<string, unknown>) {
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error ?? "Could not save. Please check your connection.");
+    setLogoUrl(json.logo_signed_url ?? null);
+    setQrUrl(json.upi_qr_signed_url ?? null);
+    await queryClient.invalidateQueries({ queryKey: ["settings", "full"] });
   }
 
   async function uploadLogo(file: File) {
@@ -170,24 +162,16 @@ export function SettingsClient({
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                void savePatch(
-                  {
-                    gym_name: gymName.trim(),
-                    address: address.trim() || null,
-                    phone: phone.trim() || null,
-                  },
-                  "Gym profile saved ✓",
-                  "gym"
-                )
+            <SectionSaveButton
+              label="Save Gym Profile"
+              onSave={() =>
+                savePatch({
+                  gym_name: gymName.trim(),
+                  address: address.trim() || null,
+                  phone: phone.trim() || null,
+                })
               }
-              disabled={savingSection !== null}
-              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {savingSection === "gym" ? "Saving…" : "Save Gym Profile"}
-            </button>
+            />
           </div>
         </section>
 
@@ -237,20 +221,10 @@ export function SettingsClient({
                 </label>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                void savePatch(
-                  { upi_id: upiId.trim() || null },
-                  "Payment details saved ✓",
-                  "payment"
-                )
-              }
-              disabled={savingSection !== null}
-              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {savingSection === "payment" ? "Saving…" : "Save Payment Details"}
-            </button>
+            <SectionSaveButton
+              label="Save Payment Details"
+              onSave={() => savePatch({ upi_id: upiId.trim() || null })}
+            />
           </div>
         </section>
 
@@ -270,7 +244,12 @@ export function SettingsClient({
                   className="h-[60px] w-[60px] rounded-lg object-contain"
                 />
               </div>
-            ) : null}
+            ) : (
+              <div className="flex h-[60px] w-[60px] items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 text-zinc-400">
+                Logo
+              </div>
+            )}
+            <p className={hintClass}>Your logo appears on all receipts</p>
             <div>
               <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
                 Choose File
@@ -334,23 +313,15 @@ export function SettingsClient({
                 </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() =>
-                void savePatch(
-                  {
-                    backup_email: backupEmail.trim() || null,
-                    whatsapp_group_link: whatsappGroupLink.trim() || null,
-                  },
-                  "Notifications saved ✓",
-                  "notifications"
-                )
+            <SectionSaveButton
+              label="Save Notifications"
+              onSave={() =>
+                savePatch({
+                  backup_email: backupEmail.trim() || null,
+                  whatsapp_group_link: whatsappGroupLink.trim() || null,
+                })
               }
-              disabled={savingSection !== null}
-              className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-            >
-              {savingSection === "notifications" ? "Saving…" : "Save Notifications"}
-            </button>
+            />
           </div>
         </section>
       </div>

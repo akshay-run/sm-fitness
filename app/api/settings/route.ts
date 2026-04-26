@@ -18,7 +18,19 @@ const patchSchema = z.object({
   ),
   whatsapp_group_link: z.preprocess(
     emptyToNull,
-    z.union([z.null(), z.string().trim().url().max(500)]).optional()
+    z
+      .union([
+        z.null(),
+        z
+          .string()
+          .trim()
+          .url()
+          .max(500)
+          .refine((value) => /^https?:\/\//i.test(value), {
+            message: "WhatsApp group link must be http or https URL",
+          }),
+      ])
+      .optional()
   ),
 });
 

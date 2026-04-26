@@ -205,6 +205,7 @@ export default async function DashboardHome() {
                         <Link
                           href={`/payments/${p.id}`}
                           className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm font-medium underline underline-offset-4"
+                          aria-label="Open payment details"
                         >
                           →
                         </Link>

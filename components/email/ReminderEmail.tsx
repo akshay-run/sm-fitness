@@ -12,33 +12,35 @@ export function renderReminderEmail({
   endDate: string;
 }) {
   const safeGym = escapeHtml(gymName);
-  const safeName = escapeHtml(memberName);
-  const safePlan = escapeHtml(planName);
+  const safeFullName = escapeHtml(memberName);
+  const safeFirstName = escapeHtml(firstNameOrFullName(memberName));
+  const safePlan = escapeHtml(planName || "your membership");
   const safeEnd = escapeHtml(endDate);
 
-  const title =
-    type === "expired"
-      ? "Membership expired"
-      : type === "reminder_1d"
-        ? "Membership expires tomorrow"
-        : "Membership expires soon";
+  const title = type === "expired" ? "Membership expired" : "Membership expiring soon";
 
   const body =
     type === "expired"
-      ? `Your membership has expired on ${safeEnd}. Please contact the gym to renew.`
+      ? `Your membership expired on <strong>${safeEnd}</strong>. We'd love to have you back.`
       : type === "reminder_1d"
-        ? `Your membership will expire tomorrow (${safeEnd}). Please renew to continue uninterrupted.`
-        : `Your membership will expire soon (${safeEnd}). Please renew in advance.`;
+        ? `Your membership expires <strong>tomorrow</strong> (${safeEnd}). Renew today to avoid any gap.`
+        : `Your membership expires in <strong>7 days</strong> on ${safeEnd}. Renew soon to keep your routine going.`;
 
   return `<!doctype html>
 <html>
   <body style="margin:0;background:#f4f4f5;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">
     <div style="max-width:560px;margin:0 auto;padding:24px;">
       <div style="background:#fff;border:1px solid #e4e4e7;border-radius:16px;padding:20px;">
-        <h1 style="margin:0 0 8px 0;font-size:18px;color:#18181b;">${escapeHtml(
-          title
-        )} — ${safeGym}</h1>
-        <p style="margin:0 0 12px 0;font-size:14px;color:#3f3f46;">Hi ${safeName},</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="height:44px;width:44px;border-radius:999px;background:#ecfeff;color:#155e75;display:flex;align-items:center;justify-content:center;font-weight:700;">
+            ${escapeHtml(gymInitials(gymName))}
+          </div>
+          <div>
+            <div style="font-size:12px;color:#64748b;">${safeGym}</div>
+            <h1 style="margin:2px 0 0 0;font-size:18px;color:#0f172a;">${escapeHtml(title)}</h1>
+          </div>
+        </div>
+        <p style="margin:0 0 12px 0;font-size:14px;color:#3f3f46;">Hi ${safeFirstName},</p>
         <p style="margin:0 0 16px 0;font-size:14px;color:#3f3f46;">${body}</p>
         <div style="padding:12px;border-radius:12px;background:#fafafa;border:1px solid #e4e4e7;">
           <div style="font-size:12px;color:#71717a;">Plan</div>
@@ -46,7 +48,8 @@ export function renderReminderEmail({
           <div style="margin-top:8px;font-size:12px;color:#71717a;">Expiry date</div>
           <div style="font-size:14px;font-weight:600;color:#18181b;">${safeEnd}</div>
         </div>
-        <p style="margin:12px 0 0 0;font-size:12px;color:#71717a;">This is an automated email.</p>
+        <p style="margin:12px 0 0 0;font-size:14px;color:#334155;">To renew, just reply to this email or contact the gym.</p>
+        <p style="margin:10px 0 0 0;font-size:12px;color:#64748b;">Member name on file: ${safeFullName}</p>
       </div>
     </div>
   </body>
@@ -60,5 +63,18 @@ function escapeHtml(input: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function firstNameOrFullName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "Member";
+  const first = trimmed.split(/\s+/)[0]?.trim();
+  return first && first.length > 0 ? first : trimmed;
+}
+
+function gymInitials(gymName: string): string {
+  const parts = gymName.trim().split(/\s+/).filter(Boolean);
+  const raw = parts.map((p) => p[0] ?? "").join("");
+  return (raw.slice(0, 2) || "GY").toUpperCase();
 }
 

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useOptimistic, useState, startTransition, type Reac
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AvatarFallback } from "@/components/ui/AvatarFallback";
 import { formatAmountINR, formatDateShortIST } from "@/lib/uiFormat";
 import {
   membershipRenewalReminderMessage,
@@ -321,6 +322,7 @@ export default function MemberProfilePage({
           startDate: formatDateShortIST(membership.start_date),
           endDate: formatDateShortIST(membership.end_date),
           whatsappGroupLink,
+          gymName,
         })
       : "";
 
@@ -342,14 +344,7 @@ export default function MemberProfilePage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 shrink-0">
-            {photoSignedUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photoSignedUrl} alt={member.full_name} className="h-16 w-16 rounded-full object-cover" />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                {getInitials(member.full_name)}
-              </div>
-            )}
+            <AvatarFallback name={member.full_name} photoUrl={photoSignedUrl} size="lg" />
           </div>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
@@ -527,13 +522,14 @@ export default function MemberProfilePage({
         >
           ✉️ Send Email
         </button>
-        <Link
-          href={`/memberships/new?memberId=${member.id}`}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-        >
-          🔄 Renew
-        </Link>
       </div>
+      <div className="my-4 border-t border-zinc-200" />
+      <Link
+        href={`/memberships/new?memberId=${member.id}`}
+        className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+      >
+        🔄 Renew
+      </Link>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card label="DOB" value={dobDisplay} />
@@ -638,9 +634,7 @@ function SectionHeader({ label, children }: { label: string; children: ReactNode
 
 function MembershipBanner({ membership }: { membership: MembershipSummary | null }) {
   if (!membership || membership.status === "none") {
-    return (
-      <div className="status-neutral rounded-lg px-4 py-3 text-sm">No membership assigned yet</div>
-    );
+    return null;
   }
   if (membership.status === "expired") {
     return (
@@ -674,13 +668,3 @@ function Card({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getInitials(name: string): string {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "M";
-  const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
-  return `${first}${second}`.toUpperCase();
-}

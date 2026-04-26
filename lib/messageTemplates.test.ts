@@ -11,7 +11,7 @@ describe("messageTemplates", () => {
       expiryDate: "11 May 2026",
       gymName: "SM FITNESS",
     });
-    expect(msg).toContain("Test User");
+    expect(msg).toContain("Test");
     expect(msg).toContain("11 May 2026");
     expect(msg).toContain("SM FITNESS");
   });

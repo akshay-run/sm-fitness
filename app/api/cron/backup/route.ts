@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
     <div><strong>Total:</strong> ${total} &nbsp;|&nbsp; <strong>Active:</strong> ${active} &nbsp;|&nbsp; <strong>Expiring this week:</strong> ${expiringSoon} &nbsp;|&nbsp; <strong>Expired:</strong> ${expired} &nbsp;|&nbsp; <strong>No plan:</strong> ${noMembership}</div>
     <div style="margin-top:8px;"><strong>This month revenue:</strong> ${formatInr(revenueThisMonth)} &nbsp;|&nbsp; <strong>Cash:</strong> ${formatInr(cashThisMonth)} &nbsp;|&nbsp; <strong>UPI:</strong> ${formatInr(upiThisMonth)}</div>
   </div>`;
-  const legendRow = `<p style="margin:0 0 12px 0;font-size:12px;color:#334155;">🔴 Expired&nbsp;&nbsp;🟡 Expiring soon&nbsp;&nbsp;🔵 No membership&nbsp;&nbsp;⚪ Active</p>`;
+  const legendRow = `<p style="margin:0 0 12px 0;font-size:12px;color:#334155;"><strong>Status split:</strong> Active ${active} · Expiring ${expiringSoon} · Expired ${expired} · No membership ${noMembership}</p>`;
 
   const rowBg: Record<RowStatus, string> = {
     expired: "#FEE2E2",

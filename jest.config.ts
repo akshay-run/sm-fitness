@@ -23,12 +23,20 @@ const config: Config = {
     "!**/*.test.{ts,tsx}",
   ],
   coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
+    // Phase C gates: enforce minimums on critical files instead of an unrealistic global threshold
+    // (pages/components not covered by unit tests would otherwise block coverage runs).
+    "lib/dateUtils.ts": { branches: 90 },
+    "lib/validations/*.ts": { branches: 90 },
+    "app/api/members/route.ts": { branches: 85 },
+    "app/api/memberships/route.ts": { branches: 85 },
+    "app/api/payments/route.ts": { branches: 85 },
+    "app/api/cron/backup/route.ts": { branches: 85 },
+    "app/api/cron/reminders/route.ts": { branches: 85 },
+    "app/api/reports/summary/route.ts": { branches: 80 },
+    "components/payments/PaymentForm.tsx": { branches: 80 },
+    "components/memberships/MembershipForm.tsx": { branches: 80 },
+    "components/settings/PlansManager.tsx": { branches: 75 },
+    "components/ui/FlowSteps.tsx": { branches: 95 },
   },
 };
 

@@ -53,11 +53,15 @@ export async function GET(req: Request) {
 
   if (dbError) return internalServerError("Failed to load payments");
 
-  return NextResponse.json({
+  const payload = {
     items: data ?? [],
     page,
     pageSize,
     total: count ?? 0,
+  };
+  return NextResponse.json({
+    data: payload,
+    ...payload,
   });
 }
 
@@ -97,7 +101,10 @@ export async function POST(req: Request) {
     return internalServerError("Failed to validate existing payment");
   }
   if ((existingCount ?? 0) > 0) {
-    return NextResponse.json({ error: "Payment already exists for this membership" }, { status: 409 });
+    return NextResponse.json(
+      { error: "A payment already exists for this membership" },
+      { status: 409 }
+    );
   }
 
   const receipt_number = await getNextReceiptNumber(supabaseAdmin);
@@ -121,7 +128,7 @@ export async function POST(req: Request) {
   if (createError) {
     if ((createError as { code?: string }).code === "23505") {
       return NextResponse.json(
-        { error: "Payment already exists for this membership" },
+        { error: "A payment already exists for this membership" },
         { status: 409 }
       );
     }
@@ -172,7 +179,7 @@ export async function POST(req: Request) {
         member_id: member.id,
         type: "receipt",
         to: receiptGuard.to,
-        subject: `Payment Receipt ${receipt_number} — ${gymName}`,
+        subject: `Receipt ✓ ${amountLabel} | ${gymName} | #${receipt_number}`,
         html,
         membership_id: membership.id,
       });
@@ -191,6 +198,7 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ id: created.id, receipt_number: created.receipt_number }, { status: 201 });
+  const createdPayload = { id: created.id, receipt_number: created.receipt_number };
+  return NextResponse.json({ data: createdPayload, ...createdPayload }, { status: 201 });
 }
 
