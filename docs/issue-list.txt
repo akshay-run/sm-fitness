@@ -1,107 +1,47 @@
-D:\sm-fitness\cursor>npm run lint
+Proposed Backup Email Structure
+SUBJECT:
+SM FITNESS — Backup 26 Apr 2026 | 28 active | ⚡ 4 new this week
 
-> cursor@0.1.0 lint
-> eslint
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total: 31  |  Active: 28  |  Expiring soon: 0
+Expired: 0  |  No plan: 3
 
+This month revenue: ₹52,200
+Cash: ₹32,500  |  UPI: ₹19,700
 
-D:\sm-fitness\cursor\components\reports\ReportsPageClient.tsx
-  156:15  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ LAST 5 DAYS  (highlighted rows)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+New members joined + payments received in this period.
+Admin sees this first — it's what changed since the last backup.
 
-Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
-* Update external systems with the latest state from React.
-* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Name       | Mobile      | Plan     | Joined/Paid  | Amount | Mode
+----------------------------------------------------------------------
+[yellow/gold background rows]
 
-Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ NEEDS ATTENTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Only shows if there's something to act on.
+Hidden entirely if all zero.
 
-D:\sm-fitness\cursor\components\reports\ReportsPageClient.tsx:156:15
-  154 |   useEffect(() => {
-  155 |     const name = settingsData?.gym_name;
-> 156 |     if (name) setGymName(String(name));
-      |               ^^^^^^^^^^ Avoid calling setState() directly within an effect
-  157 |   }, [settingsData?.gym_name]);
-  158 |
-  159 |   const error = queryError instanceof Error ? queryError.message : null;  react-hooks/set-state-in-effect
-  172:11  warning  'pageW' is assigned a value but never used                
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                                                             
-                                        @typescript-eslint/no-unused-vars    
+- Expired members → red rows
+- Expiring within 7 days → amber rows  
+- Members with no plan → blue rows
 
-D:\sm-fitness\cursor\components\settings\SettingsClient.tsx
-  3:10  warning  'useCallback' is defined but never used  @typescript-eslint/no-unused-vars
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 ALL MEMBERS  (collapsed / smaller)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Full list for reference. Sorted: expired → expiring → no plan → active.
+Admin rarely reads this section — it's the disaster recovery archive.
 
-D:\sm-fitness\cursor\coverage\lcov-report\block-navigation.js
-  1:1  warning  Unused eslint-disable directive (no problems were reported)  
+What Data to Keep in the Table
+Remove these columns — they don't help the admin take action:
+ColumnRemove?ReasonDays Left✅ KeepInstant visibilityExpiry✅ KeepSpecific date mattersPlan✅ KeepContextMobile✅ KeepTo call/WhatsApp directlyName✅ KeepObviouslyLast Paid❌ RemoveAlready in "Paid" columnAmount⚠️ Keep in "Last 5 days" onlyUseful for new payments, redundant for old active membersMode⚠️ Keep in "Last 5 days" onlySame reasonStatus❌ RemoveRow color already communicates this
+Final column set:
 
-✖ 4 problems (1 error, 3 warnings)
-  0 errors and 1 warning potentially fixable with the `--fix` option.        
-
-
-D:\sm-fitness\cursor>npm run build
-
-> cursor@0.1.0 build
-> next build
-
-▲ Next.js 16.2.2 (Turbopack)
-- Environments: .env
-
-⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-  Creating an optimized production build ...
-✓ Compiled successfully in 11.4s
-✓ Finished TypeScript in 8.5s    
-✓ Collecting page data using 7 workers in 1759ms
-✓ Generating static pages using 7 workers (28/28) in 6.5s
-✓ Finalizing page optimization in 65ms    
-
-Route (app)
-┌ ƒ /
-├ ○ /_not-found
-├ ƒ /api/cron/backup
-├ ƒ /api/cron/reminders
-├ ƒ /api/email
-├ ƒ /api/members
-├ ƒ /api/members/[id]
-├ ƒ /api/members/[id]/photo
-├ ƒ /api/memberships
-├ ƒ /api/memberships/[id]
-├ ƒ /api/payments
-├ ƒ /api/payments/[id]
-├ ƒ /api/payments/[id]/resend
-├ ƒ /api/plans
-├ ƒ /api/plans/[id]
-├ ƒ /api/reports/members-csv
-├ ƒ /api/reports/revenue
-├ ƒ /api/reports/summary
-├ ƒ /api/settings
-├ ƒ /api/settings/logo
-├ ƒ /api/settings/upi-qr
-├ ƒ /auth/callback
-├ ○ /auth/reset-password
-├ ○ /forgot-password
-├ ○ /login
-├ ƒ /members
-├ ƒ /members/[id]
-├ ƒ /members/[id]/edit
-├ ƒ /members/new
-├ ƒ /memberships/new
-├ ƒ /payments
-├ ƒ /payments/[id]
-├ ƒ /reports
-├ ƒ /settings
-└ ○ /update-password
-
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
+"Last 5 days" section: Name · Mobile · Plan · Joined Date · Amount · Mode
+"Needs attention" section: Name · Mobile · Plan · Expiry · Days Left
+"All members" section: Name · Mobile · Plan · Expiry · Days Left

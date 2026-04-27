@@ -8,6 +8,7 @@ import { hasSentEmail, sendAndLog } from "@/lib/email";
 import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderWelcomeEmail } from "@/components/email/WelcomeEmail";
 import { internalServerError } from "@/lib/apiError";
+import { getGymDisplay } from "@/lib/gymDisplay";
 
 const listQuerySchema = z.object({
   q: z.string().optional(),
@@ -349,12 +350,14 @@ export async function POST(req: Request) {
       type: "welcome",
     });
     if (!already) {
-      const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
+      const display = await getGymDisplay(supabaseAdmin);
+      const gymName = display.gym_name || process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
       const html = renderWelcomeEmail({
         gymName,
         memberName: data.full_name,
         memberCode: data.member_code,
         mobile: parsed.data.mobile,
+        whatsappGroupLink: display.whatsapp_group_link,
       });
       const firstName = data.full_name.split(" ")[0] || data.full_name;
       await sendAndLog({

@@ -35,12 +35,10 @@ function createCronSupabaseMock() {
                 error: null,
               }),
             }),
-            eq: () => ({
-              gte: () => ({
-                limit: async () => ({
-                  data: [] as { id: string; start_date: string }[],
-                  error: null,
-                }),
+            in: () => ({
+              gte: async () => ({
+                data: [] as { id: string; start_date: string }[],
+                error: null,
               }),
             }),
           }),
@@ -54,11 +52,9 @@ function createCronSupabaseMock() {
       if (table === "members") {
         return {
           select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { id: "m1", full_name: "Aman", email: "aman@example.com", is_active: true },
-                error: null,
-              }),
+            in: async () => ({
+              data: [{ id: "m1", full_name: "Aman", email: "aman@example.com", is_active: true }],
+              error: null,
             }),
           }),
         };
@@ -66,9 +62,7 @@ function createCronSupabaseMock() {
       if (table === "plans") {
         return {
           select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { name: "Monthly" }, error: null }),
-            }),
+            in: async () => ({ data: [{ id: "p1", name: "Monthly" }], error: null }),
           }),
         };
       }

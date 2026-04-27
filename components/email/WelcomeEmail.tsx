@@ -3,11 +3,13 @@ export function renderWelcomeEmail({
   memberName,
   memberCode,
   mobile,
+  whatsappGroupLink,
 }: {
   gymName: string;
   memberName: string;
   memberCode: string;
   mobile: string;
+  whatsappGroupLink?: string | null;
 }) {
   const safeGym = escapeHtml(gymName);
   const safeFullName = escapeHtml(memberName);
@@ -36,7 +38,14 @@ export function renderWelcomeEmail({
         </div>
         <p style="margin:12px 0 0 0;font-size:14px;color:#334155;"><strong>Mobile:</strong> ${safeMobile}</p>
         <p style="margin:10px 0 0 0;font-size:14px;color:#334155;">Show your member code at the front desk anytime.</p>
-        <p style="margin:10px 0 0 0;font-size:14px;color:#334155;">See you at the gym! 💪</p>
+        ${whatsappGroupLink ? `
+        <div style="margin-top:20px;text-align:center;">
+          <a href="${escapeHtml(whatsappGroupLink)}" style="display:inline-block;background:#25D366;color:#ffffff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            💬 Join our WhatsApp Group
+          </a>
+        </div>
+        ` : ""}
+        <p style="margin:20px 0 0 0;font-size:14px;color:#334155;">See you at the gym! 💪</p>
         <p style="margin:14px 0 0 0;font-size:12px;color:#64748b;">Member name on file: ${safeFullName}</p>
       </div>
     </div>

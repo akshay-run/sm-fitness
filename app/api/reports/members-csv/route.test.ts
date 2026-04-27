@@ -26,14 +26,10 @@ function makeCsvSupabaseMock() {
       if (table === "memberships") {
         return {
           select: () => ({
-            eq: () => ({
-              neq: () => ({
-                order: () => ({
-                  limit: async () => ({
-                    data: [{ plan_id: "p1", end_date: "2099-01-01" }],
-                    error: null,
-                  }),
-                }),
+            neq: () => ({
+              order: async () => ({
+                data: [{ member_id: "m1", plan_id: "p1", end_date: "2099-01-01" }],
+                error: null,
               }),
             }),
           }),
@@ -41,11 +37,7 @@ function makeCsvSupabaseMock() {
       }
       if (table === "plans") {
         return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { name: "Monthly" }, error: null }),
-            }),
-          }),
+          select: async () => ({ data: [{ id: "p1", name: "Monthly" }], error: null }),
         };
       }
       throw new Error(`Unexpected table ${table}`);

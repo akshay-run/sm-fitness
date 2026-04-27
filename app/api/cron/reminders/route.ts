@@ -6,6 +6,7 @@ import { hasSentEmailOnDate, sendAndLog } from "@/lib/email";
 import { skipMemberEmailIfNoAddress } from "@/lib/memberEmail";
 import { renderReminderEmail } from "@/components/email/ReminderEmail";
 import { formatDateShortIST } from "@/lib/uiFormat";
+import { getGymDisplay, type GymDisplay } from "@/lib/gymDisplay";
 
 type JobStat = { attempted: number; sent: number; skipped: number; failed: number };
 
@@ -13,13 +14,15 @@ async function handleType({
   type,
   targetEndDate,
   todayIST,
+  display,
 }: {
   type: "reminder_7d" | "reminder_1d" | "expired";
   targetEndDate: string; // yyyy-MM-dd
   todayIST: string; // yyyy-MM-dd
+  display: GymDisplay;
 }) {
   const supabaseAdmin = createSupabaseAdminClient();
-  const gymName = process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
+  const gymName = display.gym_name || process.env.NEXT_PUBLIC_GYM_NAME || "SM FITNESS";
 
   const { data: memberships, error } = await supabaseAdmin
     .from("memberships")
@@ -112,6 +115,8 @@ async function handleType({
       type,
       planName,
       endDate: formatDateShortIST(String(m.end_date)),
+      upiId: display.upi_id,
+      upiQrUrl: display.upi_qr_signed_url,
     });
 
     const firstName = String(member.full_name || "").trim().split(/\s+/)[0] || member.full_name;
@@ -157,9 +162,12 @@ export async function GET(req: NextRequest) {
   const date1 = addDaysIST(todayIST, 1);
 
   try {
-    const s7 = await handleType({ type: "reminder_7d", targetEndDate: date7, todayIST });
-    const s1 = await handleType({ type: "reminder_1d", targetEndDate: date1, todayIST });
-    const se = await handleType({ type: "expired", targetEndDate: todayIST, todayIST });
+    const supabaseAdmin = createSupabaseAdminClient();
+    const display = await getGymDisplay(supabaseAdmin);
+
+    const s7 = await handleType({ type: "reminder_7d", targetEndDate: date7, todayIST, display });
+    const s1 = await handleType({ type: "reminder_1d", targetEndDate: date1, todayIST, display });
+    const se = await handleType({ type: "expired", targetEndDate: todayIST, todayIST, display });
 
     return NextResponse.json({
       ok: true,
@@ -177,4 +185,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
-

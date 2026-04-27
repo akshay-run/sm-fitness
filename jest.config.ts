@@ -23,6 +23,7 @@ const config: Config = {
     "!**/*.test.{ts,tsx}",
   ],
   coverageThreshold: {
+    global: {},
     // Phase C gates: enforce minimums on critical files instead of an unrealistic global threshold
     // (pages/components not covered by unit tests would otherwise block coverage runs).
     "lib/dateUtils.ts": { branches: 90 },

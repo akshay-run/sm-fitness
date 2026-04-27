@@ -4,12 +4,16 @@ export function renderReminderEmail({
   type,
   planName,
   endDate,
+  upiId,
+  upiQrUrl,
 }: {
   gymName: string;
   memberName: string;
   type: "reminder_7d" | "reminder_1d" | "expired";
   planName: string;
   endDate: string;
+  upiId?: string | null;
+  upiQrUrl?: string | null;
 }) {
   const safeGym = escapeHtml(gymName);
   const safeFullName = escapeHtml(memberName);
@@ -48,7 +52,14 @@ export function renderReminderEmail({
           <div style="margin-top:8px;font-size:12px;color:#71717a;">Expiry date</div>
           <div style="font-size:14px;font-weight:600;color:#18181b;">${safeEnd}</div>
         </div>
-        <p style="margin:12px 0 0 0;font-size:14px;color:#334155;">To renew, just reply to this email or contact the gym.</p>
+        ${upiQrUrl || upiId ? `
+        <div style="margin-top:20px;padding:16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center;">
+          <p style="margin:0 0 12px 0;font-size:14px;color:#334155;font-weight:600;">Scan & Pay via UPI to Renew</p>
+          ${upiQrUrl ? `<img src="${escapeHtml(upiQrUrl)}" alt="UPI QR Code" style="width:150px;height:150px;border-radius:8px;margin-bottom:12px;display:inline-block;"/>` : ""}
+          ${upiId ? `<p style="margin:0;font-size:14px;color:#475569;font-family:monospace;background:#e2e8f0;padding:6px 12px;border-radius:6px;display:inline-block;">${escapeHtml(upiId)}</p>` : ""}
+        </div>
+        ` : ""}
+        <p style="margin:16px 0 0 0;font-size:14px;color:#334155;">To renew, just reply to this email, contact the gym, or complete payment via the UPI details above.</p>
         <p style="margin:10px 0 0 0;font-size:12px;color:#64748b;">Member name on file: ${safeFullName}</p>
       </div>
     </div>
